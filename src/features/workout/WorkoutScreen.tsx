@@ -21,6 +21,7 @@ import { summarizeSession } from "@/core/summary";
 import { summarizePerformance } from "@/core/recommendation/progression";
 import { addDays, formatLocalTime, localToISO, toDateKey } from "@/core/time";
 import { defaultRest } from "./format";
+import { useRestTimer } from "./rest-timer";
 import { equipmentName } from "@/features/catalog";
 import { REGION_NAME } from "@/core/muscles";
 import type { DailyRecommendationView } from "@/core/recommendation/daily";
@@ -34,6 +35,7 @@ export function WorkoutScreen() {
   const bundle = id ? derived.bundles.find((b) => b.session.id === id) : derived.active;
   const [picker, setPicker] = useState(false);
   const [summaryFor, setSummaryFor] = useState<string | null>(null);
+  const { stop: stopRest } = useRestTimer();
   const tz = facts.profile.timeZone;
   const handledAdd = useRef(false);
 
@@ -85,6 +87,7 @@ export function WorkoutScreen() {
     const pending = bundle.sets.length - done;
     if (pending && !confirmAsync(`还有 ${pending} 组未打勾，结束后将被丢弃（不计入训练）。确定结束？`)) return;
     await finishSession(s.id, isActive ? undefined : s.completedAt ?? undefined);
+    stopRest();
     haptic([20, 40, 20]);
     setSummaryFor(s.id);
   };
