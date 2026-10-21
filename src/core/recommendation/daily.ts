@@ -95,11 +95,20 @@ export function regionStates(input: DailyInput): RegionState[] {
     const est = recovery.filter((r) => REGION_KEY_MUSCLES[region].includes(r.muscleId));
     const w = worstOf(est);
     const minReadiness = est.length ? Math.min(...est.map((e) => e.readinessPct)) : 100;
+    const meanReadiness = est.length ? est.reduce((a, e) => a + e.readinessPct, 0) / est.length : 100;
+    const readyFrac = est.length ? est.filter((e) => e.baseStatus === "ready").length / est.length : 1;
     const last = input.lastTrainedDate[region];
+    // A region is only as blocked as most of its key muscles: a bench press (front delts as secondary)
+    // should not lock the whole shoulder region when side and rear delts are fresh.
+    let status: RecoveryStatus;
+    if (est.some((e) => e.status === "attention")) status = "attention";
+    else if (readyFrac === 1) status = "ready";
+    else if (readyFrac >= 0.5 || minReadiness >= 60) status = "gradual";
+    else status = "recovering";
     return {
       region,
-      status: w?.status ?? "ready",
-      readinessPct: minReadiness,
+      status,
+      readinessPct: Math.round(readyFrac === 1 ? 100 : meanReadiness),
       readyAt: w?.readyAt ?? null,
       doneThisWeek: input.weekRegionSets[region] ?? 0,
       target: input.weeklyTargets[region],
@@ -142,23 +151,26 @@ function pickExercises(
     if (e.difficulty === 1 && profile.experience === "beginner") s += 0.2;
     if (e.lateralityMode === "bilateral") s += 0.05; // faster to log
     for (const m of e.muscles) if (m.role !== "stabilizer" && !keyMuscles.has(m.muscleId) && fatigued.has(m.muscleId)) s -= 0.35 * m.contribution;
+    for (const m of e.muscles) if (m.role === "primary" && keyMuscles.has(m.muscleId) && fatigued.has(m.muscleId)) s -= 1.2 * m.contribution;
     return s;
   };
 
   const out: RecommendedExercise[] = [];
   const slots = REGION_SLOTS[region];
+  const nEx = Math.min(slots.length, totalSets <= 3 ? 1 : totalSets <= 7 ? 2 : 3);
+  const base = Math.floor(totalSets / nEx);
+  const plan = Array.from({ length: nEx }, (_, i) => base + (i < totalSets % nEx ? 1 : 0));
   let remaining = totalSets;
-  for (let i = 0; i < slots.length && remaining > 0; i++) {
+  for (let i = 0; i < nEx && remaining > 0; i++) {
     const inSlot = pool.filter((e) => slots[i].includes(e.pattern) && !chosen.has(e.id));
     const candidates = (inSlot.length ? inSlot : pool.filter((e) => !chosen.has(e.id))).sort((a, b) => score(b) - score(a));
     const ex = candidates[0];
-    if (!ex) break;
-    const pr = prescriptionFor(profile, ex.kind);
-    const sets = Math.min(pr.sets, remaining);
-    if (sets < 2 && out.length) {
-      out[out.length - 1].sets += sets;
+    if (!ex) {
+      if (out.length) out[out.length - 1].sets += remaining;
       break;
     }
+    const pr = prescriptionFor(profile, ex.kind);
+    const sets = plan[i];
     chosen.add(ex.id);
     remaining -= sets;
     const prog = suggestProgression(ex, input.history[ex.id] ?? [], pr.reps, null);

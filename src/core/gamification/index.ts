@@ -81,7 +81,8 @@ export function computeAchievements(
       const keys = REGION_KEY_MUSCLES[r];
       if (!keys.some((k) => trained.has(k))) continue;
       const wst = worstOf(est.filter((e) => keys.includes(e.muscleId)));
-      if (wst && wst.baseStatus === "ready") harvests++;
+      // a harvest needs a previous planting that has matured — the very first session is not one
+      if (wst && wst.lastTrainedAt && wst.baseStatus === "ready") harvests++;
     }
   }
 

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAppReady } from "@/features/app-data";
 import { Button, Card, Chip, SectionTitle, Sheet, StatusBadge, cx, useToast } from "@/components/ui";
 import { BodyMap } from "@/features/garden/BodyMap";
@@ -11,7 +11,7 @@ import { formatDuration } from "@/core/time";
 import { findSubstitutes, type Availability } from "@/core/recommendation/substitution";
 import { suggestProgression } from "@/core/recommendation/progression";
 import type { Level3 } from "@/core/types";
-import { addExerciseToSession, now as nowIso, saveDailyCheckin, startSession, uid } from "@/data/repo";
+import { addExerciseToSession, now as nowIso, saveDailyCheckin, snapshotDailyRecommendation, startSession, uid } from "@/data/repo";
 import { db } from "@/data/db";
 import { EQUIPMENT_TYPES } from "@/data/seed/equipment";
 import type { RecommendedExercise } from "@/core/recommendation/daily";
@@ -28,6 +28,9 @@ export function HomeScreen() {
   const tz = facts.profile.timeZone;
   const dateLabel = new Intl.DateTimeFormat("zh-CN", { timeZone: tz, month: "long", day: "numeric", weekday: "long" }).format(now);
   const checkin = facts.feedback.find((f) => f.date === derived.today && f.muscleId == null);
+  useEffect(() => {
+    snapshotDailyRecommendation(rec.date, rec).catch(() => undefined);
+  }, [rec]);
 
   const statusLine = useMemo(() => {
     if (derived.active) return "训练进行中，继续加油。";

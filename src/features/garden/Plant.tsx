@@ -22,7 +22,11 @@ export function Plant({ stage, size = "100%" }: { stage: PlantStage; size?: stri
         </g>
       )}
       {stage === "seed" && (
-        <motion.ellipse cx="30" cy="75" rx="3.4" ry="2.4" fill="#8b5e34" initial={reduce ? false : { scale: 0 }} animate={{ scale: 1 }} transition={t} />
+        <motion.g initial={reduce ? false : { scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} style={{ transformOrigin: "30px 76px" }} transition={t}>
+          <ellipse cx="30" cy="73" rx="7" ry="5.5" fill="#8b5e34" />
+          <ellipse cx="28" cy="71.5" rx="2.4" ry="1.6" fill="#b9854f" />
+          <path d="M30 68c0-4 2-7 6-8-1 4-3 7-6 8z" fill="var(--accent)" />
+        </motion.g>
       )}
       {h > 0 && (
         <g className={stage === "mature" && !reduce ? "sway" : undefined}>

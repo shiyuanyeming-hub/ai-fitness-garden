@@ -38,7 +38,7 @@ export function BarChart({ data, height = 120, target, unit = "", ariaLabel }: {
             <g key={i} onPointerEnter={() => setSel(i)} onPointerLeave={() => setSel(null)} onClick={() => setSel(sel === i ? null : i)}>
               <rect x={i * bw} y={0} width={bw} height={height} fill="transparent" />
               {v > 0 && <path d={roundedTop(x, top, w, y(0) - top, 3)} fill="var(--accent)" opacity={sel == null || sel === i ? 0.9 : 0.4} />}
-              {(i % Math.ceil(data.length / 8) === 0 || i === data.length - 1) && (
+              {(data.length - 1 - i) % Math.ceil(data.length / 6) === 0 && (
                 <text x={i * bw + bw / 2} y={height - 4} textAnchor="middle" fontSize="9" fill="var(--faint)">
                   {d.label}
                 </text>

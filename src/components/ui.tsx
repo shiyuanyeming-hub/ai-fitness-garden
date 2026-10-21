@@ -28,7 +28,7 @@ export function Button({
     <button
       {...rest}
       className={cx(
-        "inline-flex items-center justify-center gap-1.5 font-medium select-none transition disabled:opacity-40 disabled:pointer-events-none",
+        "inline-flex items-center justify-center gap-1.5 font-medium select-none whitespace-nowrap shrink-0 transition disabled:opacity-40 disabled:pointer-events-none",
         v[variant],
         s[size],
         block && "w-full",

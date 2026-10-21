@@ -1,6 +1,9 @@
 "use client";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
+import { db } from "@/data/db";
+import type { DailyRecommendationView } from "@/core/recommendation/daily";
 import { useAppReady } from "@/features/app-data";
 import { Button, Card, PageHeader, SectionTitle, Segmented, TextInput, cx, useToast } from "@/components/ui";
 import { BarChart, LineChart } from "@/components/charts";
@@ -54,6 +57,9 @@ function CalendarView() {
     setMonth(d.toISOString().slice(0, 7));
   };
   const list = (byDay.get(day) ?? []).slice().sort((a, b) => a.session.startedAt.localeCompare(b.session.startedAt));
+  const recs = useLiveQuery(() => db().recommendations.where("date").equals(day).sortBy("createdAt"), [day]);
+  const original = recs?.[0]?.view as DailyRecommendationView | undefined;
+  const actualRegions = new Set(list.flatMap((b) => summarizeSession(b, derived.exerciseById).primaryRegions));
 
   return (
     <div>
@@ -99,6 +105,13 @@ function CalendarView() {
       </Card>
 
       <SectionTitle>{day.replace(/-/g, "/")}</SectionTitle>
+      {original && (
+        <div className="text-xs text-muted px-1 mb-2">
+          当日推荐：{original.restDay ? "休息" : original.regions.map((r) => REGION_NAME[r.region]).join(" + ")}
+          {list.length > 0 && ` · 实际：${[...actualRegions].map((r) => REGION_NAME[r]).join(" + ") || "—"}`}
+          <span className="text-faint">（推荐只作对照，不计入训练）</span>
+        </div>
+      )}
       {list.length === 0 && (
         <Card className="text-center text-sm text-muted">
           这天没有训练记录
@@ -229,12 +242,12 @@ function GrowthView() {
       </Card>
 
       <SectionTitle>各部位每周有效组数（估算）</SectionTitle>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="space-y-2">
         {REGIONS.filter((r) => facts.profile.regionPriority[r.id] !== "skip").map((r) => (
           <Card key={r.id} className="!p-3">
             <div className="text-xs font-medium mb-1">{r.name}</div>
             <BarChart
-              height={90}
+              height={96}
               ariaLabel={`${r.name}每周有效组数`}
               data={regionWeeks.map((wk) => ({ label: wk.weekStart.slice(5).replace("-", "/"), value: wk.regions[r.id] ?? 0 }))}
               target={phase.weeklyTargets[r.id]}

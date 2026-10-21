@@ -317,6 +317,24 @@ describe("测试6 自主训练 & 每日推荐", () => {
     expect(rec.regions.length).toBeGreaterThan(0);
   });
 
+  it("卧推只让前束疲劳时，不封锁整个肩部，并避开前束为主的动作", () => {
+    const chest = bundle("2026-10-21T10:00:00.000Z", [{ exerciseId: "barbell_bench_press", sets: times(3, { load: 40, reps: 10, rir: 2 }) }]);
+    const rec = base([chest], "2026-10-21T12:00:00.000Z");
+    const sh = rec.regionStates.find((s) => s.region === "shoulders")!;
+    expect(sh.status).toBe("gradual");
+    const shoulderEx = rec.exercises.filter((e) => e.region === "shoulders").map((e) => EX[e.exerciseId]);
+    for (const e of shoulderEx) expect(e.muscles.find((m) => m.role === "primary")!.muscleId).not.toBe("delt_front");
+  });
+
+  it("4 组以上拆成两个不同动作", () => {
+    const rec = base([], "2026-10-21T09:00:00.000Z");
+    for (const r of rec.regions) {
+      const ex = rec.exercises.filter((e) => e.region === r.region);
+      if (r.allocatedSets >= 4) expect(ex.length).toBeGreaterThanOrEqual(2);
+      expect(ex.reduce((a, e) => a + e.sets, 0)).toBe(r.allocatedSets);
+    }
+  });
+
   it("不推荐暂不优先的腿部；推荐只引用可用动作", () => {
     const rec = base([], "2026-10-21T09:00:00.000Z");
     expect(rec.regions.map((r) => r.region)).not.toContain("legs");

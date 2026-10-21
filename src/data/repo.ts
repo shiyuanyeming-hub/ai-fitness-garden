@@ -775,3 +775,18 @@ export async function getMeta<T>(key: string): Promise<T | undefined> {
 export async function setMeta(key: string, value: unknown) {
   await db().meta.put({ key, value });
 }
+
+// ---------------------------------------------------------------- recommendation snapshots
+
+/**
+ * Keep the FIRST recommendation shown each day as the "original plan" for later comparison with what
+ * was actually trained. Never overwritten by later recomputation; never counted as training.
+ */
+export async function snapshotDailyRecommendation(date: string, view: { calculationVersion: string }) {
+  const d = db();
+  const existing = await d.recommendations.where("date").equals(date).first();
+  if (existing) return existing;
+  const rec = { id: uid(), date, view, calculationVersion: view.calculationVersion, createdAt: now(), updatedAt: now() };
+  await d.recommendations.add(rec);
+  return rec;
+}
