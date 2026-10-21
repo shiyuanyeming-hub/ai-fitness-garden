@@ -258,6 +258,7 @@ export function recommendToday(input: DailyInput): DailyRecommendationView {
   }
   const skipped = states.filter((s) => s.priority === "skip").map((s) => REGION_NAME[s.region]);
   if (skipped.length) notes.push(`${skipped.join("、")}已设为暂不优先，不主动推荐。`);
+  if (profile.limitations.trim()) notes.push(`你登记的限制：「${profile.limitations.trim()}」。选择动作时请留意，必要时使用「替换」。`);
   if (input.availability.unknown) notes.push("当前健身房还没有登记器械，按常见商业健身房器械推荐；登记器械后推荐会更准确。");
 
   const restDay = exercises.length === 0;
