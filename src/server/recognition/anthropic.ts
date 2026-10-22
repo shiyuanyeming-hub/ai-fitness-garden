@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { RecognitionError, type RecognitionProvider, type RecognitionRequest } from "./types";
 import { sanitizeResult } from "./sanitize";
+import { classifyUpstream } from "../ai-errors";
 
 const TOOL = {
   name: "report_equipment",
@@ -91,9 +92,8 @@ export function anthropicProvider(apiKey: string, model: string): RecognitionPro
         );
       } catch (e) {
         if (signal.aborted) throw new RecognitionError("timeout", "识别超时，请重试或手动登记", 504);
-        const status = (e as { status?: number }).status;
-        if (status === 401 || status === 403) throw new RecognitionError("upstream", "AI 服务密钥无效或无权限", 502);
-        throw new RecognitionError("upstream", "AI 服务暂时不可用，请稍后重试或手动登记", 502);
+        console.error("[recognize] upstream", (e as { status?: number }).status, (e as Error).message);
+        throw new RecognitionError("upstream", `${classifyUpstream(e).message}。可以先手动登记器械。`, 502);
       }
       const block = msg.content.find((b) => b.type === "tool_use");
       if (!block || block.type !== "tool_use") throw new RecognitionError("invalid_output", "AI 没有返回结构化结果", 502);

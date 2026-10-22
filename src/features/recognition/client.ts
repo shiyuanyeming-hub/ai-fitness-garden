@@ -77,14 +77,13 @@ export async function recognizeImage(img: PreparedImage, photoId: string | null)
   }
 
   const [types, exercises] = await Promise.all([allEquipmentTypes(), allExercises()]);
-  const token = (await getMeta<string>("appToken")) ?? "";
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), 50_000);
   const logId = uid();
   try {
     const res = await fetch("/api/recognize", {
       method: "POST",
-      headers: { "content-type": "application/json", ...(token ? { "x-app-token": token } : {}) },
+      headers: { "content-type": "application/json", ...(await tokenHeader()) },
       body: JSON.stringify({
         imageBase64: img.base64,
         mediaType: img.mediaType,
@@ -121,13 +120,46 @@ export async function confirmRecognition(logId: string, equipmentTypeId: string,
   });
 }
 
-export async function recognitionStatus(): Promise<{ configured: boolean; requiresToken: boolean; tokenOk: boolean; model: string | null } | null> {
+/** The access token is sent URI-encoded so tokens with non-ASCII characters survive HTTP headers. */
+export async function tokenHeader(): Promise<Record<string, string>> {
+  const t = ((await getMeta<string>("appToken")) ?? "").normalize("NFKC").trim();
+  return t ? { "x-app-token": encodeURIComponent(t) } : {};
+}
+
+export interface AiStatus {
+  configured: boolean;
+  requiresToken: boolean;
+  tokenOk: boolean;
+  token?: "not_required" | "ok" | "missing" | "mismatch";
+  model: string | null;
+}
+
+export async function recognitionStatus(): Promise<AiStatus | null> {
   try {
-    const token = (await getMeta<string>("appToken")) ?? "";
-    const r = await fetch("/api/recognize", { headers: token ? { "x-app-token": token } : {} });
+    const r = await fetch("/api/recognize", { headers: await tokenHeader(), cache: "no-store" });
     if (!r.ok) return null;
     return await r.json();
   } catch {
     return null;
+  }
+}
+
+export interface AiTestResult {
+  ok: boolean;
+  steps: { id: string; ok: boolean; message: string }[];
+  model?: string;
+  latencyMs?: number;
+}
+
+export async function testAiConnection(): Promise<AiTestResult> {
+  if (typeof navigator !== "undefined" && navigator.onLine === false)
+    return { ok: false, steps: [{ id: "server", ok: false, message: "手机当前离线" }] };
+  try {
+    const r = await fetch("/api/ai/test", { method: "POST", headers: await tokenHeader(), cache: "no-store" });
+    const j = await r.json().catch(() => null);
+    if (j?.steps) return j;
+    return { ok: false, steps: [{ id: "server", ok: false, message: `服务器返回异常（${r.status}）` }] };
+  } catch {
+    return { ok: false, steps: [{ id: "server", ok: false, message: "连不上服务器（网络问题或网址不对）" }] };
   }
 }

@@ -784,7 +784,8 @@ export async function setMeta(key: string, value: unknown) {
  */
 export async function snapshotDailyRecommendation(date: string, view: { calculationVersion: string }) {
   const d = db();
-  const existing = await d.recommendations.where("date").equals(date).first();
+  // Only the rule-engine snapshot counts here; AI advice snapshots carry view.source and are separate.
+  const existing = (await d.recommendations.where("date").equals(date).toArray()).find((r) => !(r.view as { source?: string })?.source);
   if (existing) return existing;
   const rec = { id: uid(), date, view, calculationVersion: view.calculationVersion, createdAt: now(), updatedAt: now() };
   await d.recommendations.add(rec);

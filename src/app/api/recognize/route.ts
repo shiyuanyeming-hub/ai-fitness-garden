@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getProvider, recognizeWithCache, RecognitionError } from "@/server/recognition";
 import type { RecognitionRequest } from "@/server/recognition/types";
+import { checkToken, TOKEN_MESSAGE } from "@/server/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,26 +9,22 @@ export const maxDuration = 60;
 
 const MAX_BASE64 = 3_000_000; // ≈ 2.2 MB image; the client compresses to ~1024px first
 
-function authorized(req: Request): boolean {
-  const token = process.env.APP_ACCESS_TOKEN;
-  if (!token) return true;
-  return req.headers.get("x-app-token") === token;
-}
-
 export async function GET(req: Request) {
   const p = getProvider();
   return NextResponse.json({
     configured: !!p,
     provider: p?.name ?? null,
     model: p?.model ?? null,
-    requiresToken: !!process.env.APP_ACCESS_TOKEN,
-    tokenOk: authorized(req),
+    requiresToken: checkToken(req) !== "not_required",
+    tokenOk: ["ok", "not_required"].includes(checkToken(req)),
+    token: checkToken(req),
   });
 }
 
 export async function POST(req: Request) {
   try {
-    if (!authorized(req)) throw new RecognitionError("unauthorized", "访问口令不正确（在「我的 → AI 识别设置」中填写）", 401);
+    const tk = checkToken(req);
+    if (tk === "missing" || tk === "mismatch") throw new RecognitionError("unauthorized", TOKEN_MESSAGE[tk], 401);
     const provider = getProvider();
     if (!provider) throw new RecognitionError("not_configured", "服务器还没有配置 ANTHROPIC_API_KEY，暂时只能手动登记器械", 503);
 

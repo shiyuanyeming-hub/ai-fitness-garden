@@ -9,7 +9,8 @@ Personal offline-first fitness PWA (Next.js 15 App Router, React 19, Tailwind v4
 - Laterality: `side` (left/right/both) and `movementDirection` (left/right/none) are separate. Bilateral 3 sets = 3 sets at every level. Directional sets never create left/right oblique data.
 - Assisted load: bigger = easier. Never treat it as external load. Never compare weights across different machines or load kinds.
 - Algorithms in `src/core` are pure TS with no React imports. All coefficients live in `src/core/params.ts`, tagged [依据]/[估计]; bump `CALCULATION_VERSION` and update `docs/ALGORITHMS.md` when changing them.
-- The Anthropic key is server-only (`src/server/recognition`). Never expose it or add NEXT_PUBLIC_ variants.
+- The AI coach (`/api/coach`) only picks exercises from the client-sent candidate list and explains; loads/reps come from the rule engine. Its output is a suggestion snapshot (`recommendations`, `view.source = "ai"`), never a fact.
+- The Anthropic key is server-only (`src/server`). Never expose it or add NEXT_PUBLIC_ variants.
 
 ## Commands
 - `npm test` (vitest: tests/unit), `npm run lint` (tsc), `npm run build && npm run e2e` (playwright, mock recognition, prod server on :3200).

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/data/db";
+import type { StoredAdvice } from "@/features/ai/coach-client";
 import type { DailyRecommendationView } from "@/core/recommendation/daily";
 import { useAppReady } from "@/features/app-data";
 import { Button, Card, PageHeader, SectionTitle, Segmented, TextInput, cx, useToast } from "@/components/ui";
@@ -58,7 +59,8 @@ function CalendarView() {
   };
   const list = (byDay.get(day) ?? []).slice().sort((a, b) => a.session.startedAt.localeCompare(b.session.startedAt));
   const recs = useLiveQuery(() => db().recommendations.where("date").equals(day).sortBy("createdAt"), [day]);
-  const original = recs?.[0]?.view as DailyRecommendationView | undefined;
+  const original = recs?.find((r) => !(r.view as { source?: string })?.source)?.view as DailyRecommendationView | undefined;
+  const aiAdvice = (recs?.find((r) => (r.view as { source?: string })?.source === "ai")?.view as StoredAdvice | undefined)?.advice;
   const actualRegions = new Set(list.flatMap((b) => summarizeSession(b, derived.exerciseById).primaryRegions));
 
   return (
@@ -110,6 +112,11 @@ function CalendarView() {
           当日推荐：{original.restDay ? "休息" : original.regions.map((r) => REGION_NAME[r.region]).join(" + ")}
           {list.length > 0 && ` · 实际：${[...actualRegions].map((r) => REGION_NAME[r]).join(" + ") || "—"}`}
           <span className="text-faint">（推荐只作对照，不计入训练）</span>
+        </div>
+      )}
+      {aiAdvice && (
+        <div className="text-xs text-muted px-1 mb-2">
+          AI 建议：{aiAdvice.headline}
         </div>
       )}
       {list.length === 0 && (

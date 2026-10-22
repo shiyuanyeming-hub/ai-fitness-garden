@@ -8,7 +8,7 @@ import { REGIONS } from "@/core/muscles";
 import type { ExperienceLevel, RegionPriority, UserProfile } from "@/core/types";
 import { deleteAllPhotos, deleteGym, getMeta, saveGym, setMeta, updateProfile } from "@/data/repo";
 import { backupFileName, exportBackup, importBackup } from "@/data/backup";
-import { recognitionStatus } from "@/features/recognition/client";
+import { recognitionStatus, testAiConnection, type AiStatus, type AiTestResult } from "@/features/recognition/client";
 import { db } from "@/data/db";
 import { diffDays } from "@/core/time";
 import { searchExercises } from "@/features/catalog";
@@ -451,38 +451,96 @@ function BackupCard() {
 
 function AiCard() {
   const toast = useToast();
-  const [status, setStatus] = useState<Awaited<ReturnType<typeof recognitionStatus>> | undefined>(undefined);
+  const [status, setStatus] = useState<AiStatus | null | undefined>(undefined);
   const [token, setToken] = useState("");
+  const [show, setShow] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [test, setTest] = useState<AiTestResult | null>(null);
   const photoCount = useLiveQuery(() => db().photos.count(), []);
   const logCount = useLiveQuery(() => db().recognitionLogs.count(), []);
   useEffect(() => {
     getMeta<string>("appToken").then((t) => setToken(t ?? ""));
     recognitionStatus().then(setStatus);
   }, []);
+  // Save on every keystroke (debounced) — relying on blur lost edits when the app was backgrounded.
+  useEffect(() => {
+    const id = setTimeout(async () => {
+      const cur = (await getMeta<string>("appToken")) ?? "";
+      const next = token.normalize("NFKC").trim();
+      if (cur === next) return;
+      await setMeta("appToken", next);
+      setTest(null);
+      setStatus(await recognitionStatus());
+    }, 400);
+    return () => clearTimeout(id);
+  }, [token]);
+  const runTest = async () => {
+    setTesting(true);
+    setTest(null);
+    await setMeta("appToken", token.normalize("NFKC").trim());
+    const r = await testAiConnection();
+    setTest(r);
+    setStatus(await recognitionStatus());
+    setTesting(false);
+    if (r.ok) toast("AI 连接正常");
+  };
+  const normalized = token.normalize("NFKC").trim();
   return (
     <>
-      <SectionTitle>AI 识别设置</SectionTitle>
+      <div id="ai" className="scroll-mt-4" />
+      <SectionTitle>AI 设置</SectionTitle>
       <Card className="space-y-3">
-        <div className="text-sm">
+        <div className="text-sm" data-testid="ai-status">
           {status === undefined
             ? "检查中…"
             : status === null
-              ? "无法连接识别服务（离线或未部署）。手动登记器械不受影响。"
-              : status.configured
-                ? `✅ 已配置（${status.model}）${status.requiresToken && !status.tokenOk ? " · 访问口令不正确" : ""}`
-                : "⚠️ 服务器未配置 ANTHROPIC_API_KEY。请在部署平台的环境变量中添加，见 DEPLOY.md。"}
+              ? "无法连接服务器（离线或未部署）。手动登记器械不受影响。"
+              : !status.configured
+                ? "⚠️ 服务器未配置 ANTHROPIC_API_KEY。请在 Vercel 环境变量中添加，见 DEPLOY.md。"
+                : status.token === "missing"
+                  ? `⚠️ 已配置（${status.model}），但这台设备还没填访问口令`
+                  : status.token === "mismatch" || (status.requiresToken && !status.tokenOk)
+                    ? `⚠️ 已配置（${status.model}），但访问口令和服务器不一致`
+                    : `✅ 已配置（${status.model}）${status.requiresToken ? " · 口令正确" : ""}`}
         </div>
-        <Field label="访问口令（如服务器设置了 APP_ACCESS_TOKEN）" hint="只保存在本机，用于防止他人调用你的识别接口">
-          <TextInput
-            type="password"
-            value={token}
-            onChange={(e) => setToken(e.target.value)}
-            onBlur={async () => {
-              await setMeta("appToken", token.trim());
-              setStatus(await recognitionStatus());
-            }}
-          />
+        <Field
+          label="访问口令（和 Vercel 里的 APP_ACCESS_TOKEN 一致）"
+          hint={normalized ? `已保存在本机 · ${normalized.length} 个字符 · 区分大小写` : "只保存在本机，用于防止他人调用你的 AI 接口"}
+        >
+          <div className="flex gap-2">
+            <TextInput
+              // Plain text field with masking: type="password" made iOS offer to autofill or replace it with a saved password.
+              type="text"
+              name="app-access-token"
+              autoComplete="off"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              inputMode="text"
+              data-testid="app-token"
+              style={show ? undefined : ({ WebkitTextSecurity: "disc" } as React.CSSProperties)}
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              className="flex-1"
+            />
+            <Button size="sm" onClick={() => setShow((v) => !v)}>
+              {show ? "隐藏" : "显示"}
+            </Button>
+          </div>
         </Field>
+        <Button block onClick={runTest} disabled={testing} data-testid="ai-test">
+          {testing ? "正在测试…" : "测试 AI 连接"}
+        </Button>
+        {test && (
+          <div className={cx("rounded-xl p-3 text-sm space-y-1", test.ok ? "bg-accent/10" : "bg-attention/10")} data-testid="ai-test-result">
+            {test.steps.map((s) => (
+              <div key={s.id}>
+                {s.ok ? "✅" : "❌"} {s.message}
+              </div>
+            ))}
+            {test.ok && <div className="text-xs text-muted pt-1">拍照识别和 AI 每日建议都可以正常使用。</div>}
+          </div>
+        )}
         <div className="text-xs text-muted space-y-1">
           <p>· API Key 只在服务器端使用，不会出现在浏览器里。</p>
           <p>· 照片先在手机上压缩（约 1024px、去除定位等 EXIF 信息），识别时发送给 AI，服务器不保存图片。</p>

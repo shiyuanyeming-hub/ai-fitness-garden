@@ -82,7 +82,7 @@ export interface DailyInput {
   familiar: Set<string>;
 }
 
-function prescriptionFor(profile: UserProfile, kind: ExerciseKind) {
+export function prescriptionFor(profile: UserProfile, kind: ExerciseKind) {
   const p = PRESCRIPTION[profile.experience];
   if (kind === "compound") return p.compound;
   if (kind === "core") return p.core;

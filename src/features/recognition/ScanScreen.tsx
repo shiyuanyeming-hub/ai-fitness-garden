@@ -292,11 +292,16 @@ function ManualEquipment({ error, onRetry, onPick }: { error: string | null; onR
         <Card className="!bg-attention/10 border-attention/30">
           <div className="text-sm">{error}</div>
           <div className="text-xs text-muted mt-1">不影响记录：可以手动选择器械，已输入的训练也不会丢失。</div>
-          {onRetry && (
-            <Button size="sm" className="mt-2" onClick={onRetry}>
-              重试识别
-            </Button>
-          )}
+          <div className="flex gap-2 mt-2">
+            {onRetry && (
+              <Button size="sm" onClick={onRetry}>
+                重试识别
+              </Button>
+            )}
+            <Link href="/me#ai" className="h-9 px-3 text-sm rounded-xl inline-flex items-center text-accent">
+              去测试 AI 连接 ›
+            </Link>
+          </div>
         </Card>
       )}
       <TextInput placeholder="搜索器械（中文 / 日本語 / English）" value={q} onChange={(e) => setQ(e.target.value)} />

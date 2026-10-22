@@ -16,7 +16,7 @@ npm run dev                     # http://localhost:3000
 
 | 命令 | 作用 |
 |---|---|
-| `npm test` | 单元 + 数据层测试（Vitest，55 项） |
+| `npm test` | 单元 + 数据层测试（Vitest，67 项） |
 | `npm run build && npm run e2e` | 生产构建 + 端到端测试（Playwright，iPhone 尺寸，8 个验收流程，含离线） |
 | `npm run lint` | TypeScript 类型检查 |
 
@@ -39,7 +39,8 @@ npm run dev                     # http://localhost:3000
 | 历史日历、补录/修改/删除（自动重算）、趋势、PR、左右差异、体重、目标进度、推荐 vs 实际对照 | ✅ |
 | 离线（Service Worker + IndexedDB）、JSON 备份/恢复 | ✅ |
 | 云端同步 / 多设备 | ⏳ 第二阶段（数据层已按可同步设计：UUID、updatedAt、删除墓碑） |
-| AI 自然语言训练解释 | ⏳ 未实现（当前解释由规则生成，可审计） |
+| AI 教练每日建议（结合训练习惯、本周训练量、肌群恢复；重量次数仍由规则计算） | ✅ |
+| 「测试 AI 连接」逐项诊断（服务器 / Key / 口令 / 实际调用） | ✅ |
 | 推送通知（组间休息结束提醒） | ⏳ 未实现（iOS PWA 限制较多；目前为屏幕提示 + Android 振动） |
 
 ## 文档

@@ -15,6 +15,9 @@ import { addExerciseToSession, now as nowIso, saveDailyCheckin, snapshotDailyRec
 import { db } from "@/data/db";
 import { EQUIPMENT_TYPES } from "@/data/seed/equipment";
 import type { RecommendedExercise } from "@/core/recommendation/daily";
+import { AiCoachCard } from "@/features/ai/AiCoachCard";
+import { aiRecId } from "@/features/ai/coach-client";
+import { useLiveQuery } from "dexie-react-hooks";
 
 export function HomeScreen() {
   const { facts, derived, now } = useAppReady();
@@ -24,6 +27,9 @@ export function HomeScreen() {
   const [subFor, setSubFor] = useState<(RecommendedExercise & { replacedFrom?: string }) | null>(null);
   const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [showWhy, setShowWhy] = useState(false);
+  const [ruleOpen, setRuleOpen] = useState(false);
+  const hasAi = useLiveQuery(async () => !!(await db().recommendations.get(aiRecId(derived.today))), [derived.today]);
+  const ruleCollapsed = !!hasAi && !ruleOpen;
   const rec = derived.recommendation;
   const tz = facts.profile.timeZone;
   const dateLabel = new Intl.DateTimeFormat("zh-CN", { timeZone: tz, month: "long", day: "numeric", weekday: "long" }).format(now);
@@ -126,7 +132,9 @@ export function HomeScreen() {
       </Card>
 
       <SectionTitle>今天建议练什么</SectionTitle>
+      <AiCoachCard />
       <Card>
+        <div className="text-[11px] text-faint mb-0.5">规则计算的建议 · 离线可用</div>
         <div className="font-semibold text-lg">{rec.headline}</div>
         {!rec.restDay && <div className="text-xs text-muted mt-0.5">约 {rec.estimatedMinutes} 分钟 · 建议不是命令，你可以随时自由训练</div>}
         {rec.cautions.length > 0 && (
@@ -161,6 +169,13 @@ export function HomeScreen() {
           </div>
         )}
 
+        {ruleCollapsed && (
+          <button className="mt-2 text-xs text-accent" onClick={() => setRuleOpen(true)}>
+            已有 AI 建议，展开规则建议（{rec.exercises.length} 个动作）
+          </button>
+        )}
+        {!ruleCollapsed && (
+        <>
         <div className="mt-3 divide-y divide-line">
           {items.map((r) => {
             const ex = derived.exerciseById[r.exerciseId];
@@ -192,6 +207,8 @@ export function HomeScreen() {
           <Button variant="primary" block size="lg" className="mt-2" onClick={startPlanned} disabled={!!derived.active}>
             按建议开始训练
           </Button>
+        )}
+        </>
         )}
       </Card>
 

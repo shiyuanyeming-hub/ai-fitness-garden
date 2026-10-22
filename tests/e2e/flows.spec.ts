@@ -191,3 +191,25 @@ test("测试9：离线记录，关闭后重新打开数据仍在", async ({ page
   await expect(page.getByText("离线中")).toBeVisible();
   await context.setOffline(false);
 });
+
+test("AI 连接测试与每日 AI 建议（模拟模式）", async ({ page }) => {
+  await ready(page, "/me");
+  await page.getByTestId("ai-test").click();
+  await expect(page.getByTestId("ai-test-result")).toContainText("模拟调用成功");
+  // token field saves while typing (no blur needed) and reports its length
+  await page.getByTestId("app-token").fill("ａｂｃ");
+  await expect(page.getByText("已保存在本机 · 3 个字符")).toBeVisible();
+  await page.getByTestId("app-token").fill("");
+
+  await ready(page, "/");
+  // auto-generated once per day when AI is reachable
+  await expect(page.getByTestId("ai-coach-headline")).toBeVisible();
+  await expect(page.getByText("规则计算的建议 · 离线可用")).toBeVisible();
+  const start = page.getByTestId("ai-coach-start");
+  if (await start.isVisible()) {
+    await start.click();
+    await expect(page).toHaveURL(/\/workout/);
+    // prefilled sets are not facts until ticked
+    await expect(page.getByRole("button", { name: "取消完成" })).toHaveCount(0);
+  }
+});
