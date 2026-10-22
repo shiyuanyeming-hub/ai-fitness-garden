@@ -77,25 +77,59 @@ export async function generateAdvice(cfg: AiConfig, input: CoachInput, signal?: 
     if (process.env.RECOGNITION_MOCK_FAIL === "1") throw new CoachError("upstream", "模拟：AI 服务暂时不可用");
     return mockAdvice(input);
   }
-  let msg;
-  try {
-    msg = await cfg.client.messages.create(
-      {
-        model: cfg.model,
-        max_tokens: 1200,
-        system: SYSTEM,
-        tools: [TOOL],
-        tool_choice: { type: "tool", name: TOOL.name },
-        messages: [{ role: "user", content: `以下是用户今天的数据（JSON）：\n${JSON.stringify(input)}\n\n请给出今天的建议。` }],
+  const user = `以下是用户今天的数据（JSON）：\n${JSON.stringify(input)}\n\n请给出今天的建议。`;
+  // Attempt 1: forced tool call (structured). If the API rejects the request shape (400),
+  // fall back to tool_choice auto, then to plain JSON text — so one unsupported option can't break the feature.
+  const attempts: { label: string; run: () => Promise<unknown> }[] = [
+    {
+      label: "tool",
+      run: async () => {
+        const msg = await cfg.client.messages.create({ model: cfg.model, max_tokens: 1500, system: SYSTEM, tools: [TOOL], tool_choice: { type: "tool", name: TOOL.name }, messages: [{ role: "user", content: user }] }, { signal });
+        const b = msg.content.find((x) => x.type === "tool_use");
+        return b && b.type === "tool_use" ? b.input : null;
       },
-      { signal },
-    );
-  } catch (e) {
-    console.error("[coach] upstream", (e as { status?: number }).status, (e as Error).message);
-    const p = classifyUpstream(e, signal?.aborted);
-    throw new CoachError(p.code, p.message);
+    },
+    {
+      label: "auto",
+      run: async () => {
+        const msg = await cfg.client.messages.create({ model: cfg.model, max_tokens: 1500, system: SYSTEM, tools: [TOOL], messages: [{ role: "user", content: `${user}\n请调用 ${TOOL.name} 工具给出结果。` }] }, { signal });
+        const b = msg.content.find((x) => x.type === "tool_use");
+        return b && b.type === "tool_use" ? b.input : null;
+      },
+    },
+    {
+      label: "json",
+      run: async () => {
+        const msg = await cfg.client.messages.create(
+          {
+            model: cfg.model,
+            max_tokens: 1500,
+            system: `${SYSTEM}\n\n只输出一个 JSON 对象，不要任何其他文字。字段：${JSON.stringify(TOOL.input_schema.properties)}`,
+            messages: [{ role: "user", content: user }],
+          },
+          { signal },
+        );
+        const text = msg.content.map((x) => (x.type === "text" ? x.text : "")).join("");
+        const m = text.match(/\{[\s\S]*\}/);
+        return m ? JSON.parse(m[0]) : null;
+      },
+    },
+  ];
+  let lastErr: unknown = null;
+  for (const a of attempts) {
+    try {
+      const out = await a.run();
+      if (out) return sanitizeAdvice(out, input);
+      lastErr = new CoachError("invalid_output", "AI 没有返回结构化建议");
+    } catch (e) {
+      lastErr = e;
+      const status = (e as { status?: number }).status;
+      console.error(`[coach] attempt ${a.label} failed`, status, (e as Error).message);
+      if (signal?.aborted || status !== 400) break; // only request-shape errors are worth retrying differently
+    }
   }
-  const block = msg.content.find((b) => b.type === "tool_use");
-  if (!block || block.type !== "tool_use") throw new CoachError("invalid_output", "AI 没有返回结构化建议");
-  return sanitizeAdvice(block.input, input);
+  if (lastErr instanceof CoachError) throw lastErr;
+  const p = classifyUpstream(lastErr, signal?.aborted);
+  throw new CoachError(p.code, p.detail ? `${p.message}（${p.detail}）` : p.message);
 }
+

@@ -93,7 +93,8 @@ export function anthropicProvider(apiKey: string, model: string): RecognitionPro
       } catch (e) {
         if (signal.aborted) throw new RecognitionError("timeout", "识别超时，请重试或手动登记", 504);
         console.error("[recognize] upstream", (e as { status?: number }).status, (e as Error).message);
-        throw new RecognitionError("upstream", `${classifyUpstream(e).message}。可以先手动登记器械。`, 502);
+        const p = classifyUpstream(e);
+        throw new RecognitionError("upstream", `${p.message}${p.detail ? `（${p.detail}）` : ""}。可以先手动登记器械。`, 502);
       }
       const block = msg.content.find((b) => b.type === "tool_use");
       if (!block || block.type !== "tool_use") throw new RecognitionError("invalid_output", "AI 没有返回结构化结果", 502);

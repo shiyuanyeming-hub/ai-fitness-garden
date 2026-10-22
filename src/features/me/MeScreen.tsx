@@ -404,6 +404,7 @@ function BackupCard() {
           存储：{persisted ? "已申请持久保存" : "浏览器可能在空间不足时清理"}
           {usage && ` · 已用 ${usage}`}
         </div>
+        <LocalDataInfo />
         <div className="grid grid-cols-2 gap-2">
           <Button variant="primary" onClick={() => download(false)}>
             导出 JSON
@@ -565,5 +566,32 @@ function AiCard() {
         </div>
       </Card>
     </>
+  );
+}
+
+/** Shows which storage this screen is reading — home-screen app, Safari tab and each URL keep separate data. */
+function LocalDataInfo() {
+  const counts = useLiveQuery(async () => {
+    const d = db();
+    const [sessions, sets, equipment] = await Promise.all([
+      d.sessions.where("status").equals("completed").count(),
+      d.sets.filter((x) => x.completedAt != null).count(),
+      d.gymEquipment.count(),
+    ]);
+    return { sessions, sets, equipment };
+  }, []);
+  const [where, setWhere] = useState("");
+  useEffect(() => {
+    const standalone = window.matchMedia?.("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone;
+    setWhere(`${location.host} · ${standalone ? "主屏幕 App" : "浏览器标签页"}`);
+  }, []);
+  return (
+    <div className="text-xs text-muted rounded-xl bg-surface-2 p-2.5" data-testid="local-data-info">
+      <div>当前数据来源：{where}</div>
+      <div>
+        本机已有：训练 {counts?.sessions ?? "…"} 次 · 已完成组 {counts?.sets ?? "…"} 组 · 器械 {counts?.equipment ?? "…"} 台
+      </div>
+      <div className="text-faint mt-0.5">主屏幕 App、Safari 标签页、不同网址的数据各自独立，互相看不到。</div>
+    </div>
   );
 }

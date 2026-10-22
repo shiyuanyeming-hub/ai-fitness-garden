@@ -42,7 +42,7 @@ export async function POST(req: Request) {
   } catch (e) {
     console.error("[ai/test] upstream", (e as { status?: number }).status, (e as Error).message);
     const p = classifyUpstream(e);
-    steps.push({ id: "call", ok: false, message: p.message });
+    steps.push({ id: "call", ok: false, message: p.detail ? `${p.message}（${p.detail}）` : p.message });
     return NextResponse.json({ ok: false, steps, model: cfg.model, upstream: p.code });
   }
 }

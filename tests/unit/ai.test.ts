@@ -148,3 +148,35 @@ describe("AI 每日建议", () => {
     expect(garbage.status).toBe(400);
   });
 });
+
+describe("AI 建议请求降级", () => {
+  const inp = {
+    candidates: [{ id: "lat_pulldown", name: "高位下拉", region: "back", primary: ["背阔肌"], primaryFatigued: false, familiar: false }],
+    profile: { experience: "初学者", priorities: { back: "focus" } },
+    habits: { avgSessionsPerWeek: 2 },
+  } as unknown as CoachInput;
+  const err400 = Object.assign(new Error("400 invalid"), { status: 400, error: { error: { type: "invalid_request_error", message: "tool_choice not supported" } } });
+
+  it("强制工具调用被拒（400）→ 自动改用其他方式，仍得到建议", async () => {
+    const { generateAdvice } = await import("@/server/coach");
+    const calls: unknown[] = [];
+    const client = {
+      messages: {
+        create: async (body: { tool_choice?: unknown }) => {
+          calls.push(body);
+          if (body.tool_choice) throw err400;
+          return { content: [{ type: "tool_use", input: { day_type: "train", headline: "练背", exercises: [{ exercise_id: "lat_pulldown", sets: 3, note: "" }] } }] };
+        },
+      },
+    };
+    const a = await generateAdvice({ mode: "anthropic", model: "m", client } as never, inp);
+    expect(calls).toHaveLength(2);
+    expect(a.exercises[0].exerciseId).toBe("lat_pulldown");
+  });
+
+  it("全部失败 → 错误里带上游详情，不再误报「找不到模型」", async () => {
+    const { generateAdvice } = await import("@/server/coach");
+    const client = { messages: { create: async () => { throw err400; } } };
+    await expect(generateAdvice({ mode: "anthropic", model: "m", client } as never, inp)).rejects.toThrow(/拒绝.*tool_choice not supported/);
+  });
+});
