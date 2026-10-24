@@ -4,7 +4,7 @@
  *  - /_next/static and icons: cache first (immutable hashed files)
  *  - /api/*: never cached
  */
-const VERSION = "afg-v2";
+const VERSION = "afg-v3";
 const SHELL = ["/", "/workout", "/scan", "/equipment", "/exercise", "/farm", "/history", "/me", "/about", "/manifest.webmanifest", "/icon-192.png", "/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {

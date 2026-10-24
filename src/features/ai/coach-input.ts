@@ -54,6 +54,14 @@ export function buildCoachInput(f: Facts, d: Derived, nowMs: number): CoachInput
     .map(([id, times]) => ({ name: d.exerciseById[id]?.name ?? "自定义动作", times }));
   const lastDate = completed[0] ? sessionDateKey(completed[0].session.startedAt, tz) : null;
   const ws = weekStart(today);
+  const since7 = addDays(today, -6);
+  let cardioSec7 = 0;
+  for (const b of completed) {
+    if (sessionDateKey(b.session.startedAt, tz) < since7) continue;
+    for (const we of b.exercises)
+      if (d.exerciseById[we.exerciseId]?.kind === "cardio")
+        for (const st of b.sets) if (st.workoutExerciseId === we.id && st.completedAt) cardioSec7 += st.durationSeconds ?? 0;
+  }
   const weekDays = new Set(completed.map((b) => sessionDateKey(b.session.startedAt, tz)).filter((k) => k >= ws));
 
   // ---- recent sessions (14 days, working sets only) ----
@@ -67,7 +75,13 @@ export function buildCoachInput(f: Facts, d: Derived, nowMs: number): CoachInput
       exercises: b.exercises
         .map((we) => {
           const sets = b.sets.filter((s) => s.workoutExerciseId === we.id && s.completedAt && s.setType !== "warmup");
-          return { name: d.exerciseById[we.exerciseId]?.name ?? "自定义动作", workingSets: sets.length, best: fmtBest(sets) };
+          const ex = d.exerciseById[we.exerciseId];
+          if (ex?.kind === "cardio") {
+            const min = Math.round(sets.reduce((a, x) => a + (x.durationSeconds ?? 0), 0) / 60);
+            const km = Math.round(sets.reduce((a, x) => a + (x.distanceM ?? 0), 0) / 100) / 10;
+            return { name: `${ex.name}（有氧）`, workingSets: sets.length, best: `${min}分钟${km ? ` ${km}km` : ""}` };
+          }
+          return { name: ex?.name ?? "自定义动作", workingSets: sets.length, best: fmtBest(sets) };
         })
         .filter((e) => e.workingSets > 0)
         .slice(0, 12),
@@ -161,6 +175,7 @@ export function buildCoachInput(f: Facts, d: Derived, nowMs: number): CoachInput
       daysSinceLastSession: lastDate ? diffDays(today, lastDate) : null,
       sessionsThisWeek: weekDays.size,
       trainedToday: weekDays.has(today),
+      cardioMinutes7d: Math.round(cardioSec7 / 60),
       topExercises,
     },
     recent,

@@ -37,6 +37,7 @@ const schema = z.object({
     daysSinceLastSession: z.number().nullable(),
     sessionsThisWeek: z.number(),
     trainedToday: z.boolean(),
+    cardioMinutes7d: z.number().optional(),
     topExercises: z.array(z.object({ name: s(60), times: z.number() })).max(10),
   }),
   recent: z

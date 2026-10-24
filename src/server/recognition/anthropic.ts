@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { RecognitionError, type RecognitionProvider, type RecognitionRequest } from "./types";
 import { sanitizeResult } from "./sanitize";
 import { classifyUpstream } from "../ai-errors";
+import { NoStructuredOutput, structuredCall } from "../structured";
 
 const TOOL = {
   name: "report_equipment",
@@ -69,36 +70,27 @@ export function anthropicProvider(apiKey: string, model: string): RecognitionPro
     async recognize(req: RecognitionRequest, signal: AbortSignal) {
       const catalog = req.catalog.map((c) => `${c.id}: ${c.nameEn ?? ""} / ${c.name}${c.cues ? ` — ${c.cues}` : ""}`).join("\n");
       const exercises = req.exercises.map((e) => `${e.id} (${e.nameEn}) [${e.equipmentTypes.join(",")}]`).join("\n");
-      let msg;
+      let out: unknown;
       try {
-        msg = await client.messages.create(
-          {
-            model,
-            max_tokens: 900,
-            system: SYSTEM,
-            tools: [TOOL],
-            tool_choice: { type: "tool", name: TOOL.name },
-            messages: [
-              {
-                role: "user",
-                content: [
-                  { type: "image", source: { type: "base64", media_type: req.mediaType, data: req.imageBase64 } },
-                  { type: "text", text: `Equipment catalog (id: name — cues):\n${catalog}\n\nExercise list (id (name) [equipment ids]):\n${exercises}\n\nIdentify the equipment.` },
-                ],
-              },
-            ],
-          },
-          { signal },
-        );
+        out = await structuredCall(client, {
+          model,
+          system: SYSTEM,
+          tool: TOOL,
+          maxTokens: 1200,
+          signal,
+          log: "recognize",
+          content: [
+            { type: "image", source: { type: "base64", media_type: req.mediaType, data: req.imageBase64 } },
+            { type: "text", text: `Equipment catalog (id: name — cues):\n${catalog}\n\nExercise list (id (name) [equipment ids]):\n${exercises}\n\nIdentify the equipment.` },
+          ],
+        });
       } catch (e) {
         if (signal.aborted) throw new RecognitionError("timeout", "识别超时，请重试或手动登记", 504);
-        console.error("[recognize] upstream", (e as { status?: number }).status, (e as Error).message);
+        if (e instanceof NoStructuredOutput) throw new RecognitionError("invalid_output", "AI 没有返回结构化结果，请重试或手动登记", 502);
         const p = classifyUpstream(e);
         throw new RecognitionError("upstream", `${p.message}${p.detail ? `（${p.detail}）` : ""}。可以先手动登记器械。`, 502);
       }
-      const block = msg.content.find((b) => b.type === "tool_use");
-      if (!block || block.type !== "tool_use") throw new RecognitionError("invalid_output", "AI 没有返回结构化结果", 502);
-      return sanitizeResult(block.input, req);
+      return sanitizeResult(out, req);
     },
   };
 }

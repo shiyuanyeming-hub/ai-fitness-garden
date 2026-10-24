@@ -61,8 +61,8 @@ npm run build && npm start   # 生产模式（离线功能生效）
 ## 5. 测试
 
 ```bash
-npm test                     # 67 项单元/数据层/接口测试
-npm run build && npm run e2e # 9 个端到端验收流程（自动以 mock 识别启动生产服务器）
+npm test                     # 80 项单元/数据层/接口测试
+npm run build && npm run e2e # 12 个端到端验收流程（自动以 mock 识别启动生产服务器）
 ```
 
 ## 6. 长期维护

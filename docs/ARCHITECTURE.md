@@ -45,7 +45,7 @@ src/
     repo.ts                 所有写操作 + 校验
     derived.ts              loadFacts() + computeDerived()
     backup.ts               JSON 导出/导入（合并按 id + updatedAt，幂等）
-    seed/                   器械目录（29 类）、动作库（61 个，含肌群映射）
+    seed/                   器械目录（52 类，其中有氧 10 类）、动作库（94 个，含肌群映射）
   server/recognition/       识别 provider 接口、Anthropic 实现、mock、输出清洗
   server/coach/             AI 每日建议：提示词、mock、输出清洗
   server/auth.ts            访问口令校验（NFKC 规范化、去空白、常数时间比较，区分「没填/不一致」）
@@ -56,7 +56,7 @@ src/
   app/                      路由：/ /workout /scan /equipment /exercise /farm /history /me /about /api/recognize
 tests/
   unit/                     core / data / recognition
-  e2e/flows.spec.ts         9 个验收流程（生产构建 + mock 识别）
+  e2e/flows.spec.ts         12 个验收流程（生产构建 + mock 识别）
 ```
 
 ## 页面

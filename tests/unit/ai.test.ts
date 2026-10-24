@@ -149,34 +149,60 @@ describe("AI 每日建议", () => {
   });
 });
 
-describe("AI 建议请求降级", () => {
+describe("结构化调用：不依赖强制 tool_choice（claude-sonnet-5-5 不支持）", () => {
   const inp = {
     candidates: [{ id: "lat_pulldown", name: "高位下拉", region: "back", primary: ["背阔肌"], primaryFatigued: false, familiar: false }],
     profile: { experience: "初学者", priorities: { back: "focus" } },
     habits: { avgSessionsPerWeek: 2 },
   } as unknown as CoachInput;
-  const err400 = Object.assign(new Error("400 invalid"), { status: 400, error: { error: { type: "invalid_request_error", message: "tool_choice not supported" } } });
+  const err400 = Object.assign(new Error("400 invalid"), { status: 400, error: { error: { type: "invalid_request_error", message: 'tool_choice: type "tool" and "any" are not supported for this model.' } } });
+  const advice = { day_type: "train", headline: "练背", exercises: [{ exercise_id: "lat_pulldown", sets: 3, note: "" }] };
 
-  it("强制工具调用被拒（400）→ 自动改用其他方式，仍得到建议", async () => {
+  it("从不发送 tool_choice；正常返回工具结果", async () => {
     const { generateAdvice } = await import("@/server/coach");
-    const calls: unknown[] = [];
+    const calls: Record<string, unknown>[] = [];
+    const client = { messages: { create: async (body: Record<string, unknown>) => (calls.push(body), { content: [{ type: "tool_use", input: advice }] }) } };
+    const a = await generateAdvice({ mode: "anthropic", model: "m", client } as never, inp);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].tool_choice).toBeUndefined();
+    expect(a.exercises[0].exerciseId).toBe("lat_pulldown");
+  });
+
+  it("模型用文字回答 JSON 也能解析", async () => {
+    const { generateAdvice } = await import("@/server/coach");
+    const client = { messages: { create: async () => ({ content: [{ type: "text", text: "好的：\n```json\n" + JSON.stringify(advice) + "\n```" }] }) } };
+    const a = await generateAdvice({ mode: "anthropic", model: "m", client } as never, inp);
+    expect(a.headline).toBe("练背");
+  });
+
+  it("工具模式被拒（400）→ 改用纯 JSON 模式", async () => {
+    const { generateAdvice } = await import("@/server/coach");
+    const calls: Record<string, unknown>[] = [];
     const client = {
       messages: {
-        create: async (body: { tool_choice?: unknown }) => {
+        create: async (body: Record<string, unknown>) => {
           calls.push(body);
-          if (body.tool_choice) throw err400;
-          return { content: [{ type: "tool_use", input: { day_type: "train", headline: "练背", exercises: [{ exercise_id: "lat_pulldown", sets: 3, note: "" }] } }] };
+          if (body.tools) throw err400;
+          return { content: [{ type: "text", text: JSON.stringify(advice) }] };
         },
       },
     };
     const a = await generateAdvice({ mode: "anthropic", model: "m", client } as never, inp);
     expect(calls).toHaveLength(2);
-    expect(a.exercises[0].exerciseId).toBe("lat_pulldown");
+    expect(a.exercises).toHaveLength(1);
   });
 
-  it("全部失败 → 错误里带上游详情，不再误报「找不到模型」", async () => {
+  it("全部失败 → 错误里带上游详情", async () => {
     const { generateAdvice } = await import("@/server/coach");
     const client = { messages: { create: async () => { throw err400; } } };
-    await expect(generateAdvice({ mode: "anthropic", model: "m", client } as never, inp)).rejects.toThrow(/拒绝.*tool_choice not supported/);
+    await expect(generateAdvice({ mode: "anthropic", model: "m", client } as never, inp)).rejects.toThrow(/拒绝.*not supported/);
+  });
+
+  it("非 400 错误（如 Key 无效）不重试", async () => {
+    const { generateAdvice } = await import("@/server/coach");
+    let n = 0;
+    const client = { messages: { create: async () => { n++; throw Object.assign(new Error("401"), { status: 401 }); } } };
+    await expect(generateAdvice({ mode: "anthropic", model: "m", client } as never, inp)).rejects.toThrow(/Key/);
+    expect(n).toBe(1);
   });
 });

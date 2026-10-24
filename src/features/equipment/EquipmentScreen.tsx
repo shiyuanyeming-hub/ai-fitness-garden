@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import { useAppReady } from "@/features/app-data";
 import { Button, Card, Chip, Field, PageHeader, Segmented, Sheet, TextInput, confirmAsync, cx, useToast } from "@/components/ui";
+import { TypePicker } from "./TypePicker";
 import { PhotoThumb, usePhotoUrl } from "./PhotoThumb";
 import { equipmentName, exercisesForEquipmentType, muscleNames, primaryRegion } from "@/features/catalog";
 import { addGymEquipment, deleteGymEquipment, deletePhoto, savePhoto, updateGymEquipment, updateProfile } from "@/data/repo";
@@ -128,31 +129,16 @@ export function EquipmentScreen() {
 function AddSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { facts } = useAppReady();
   const toast = useToast();
-  const [q, setQ] = useState("");
-  const list = facts.equipmentTypes.filter((t) => !q || [t.name, t.nameJa, t.nameEn].some((s) => s?.toLowerCase().includes(q.toLowerCase())));
   return (
     <Sheet open={open} onClose={onClose} title="手动添加器械">
-      <TextInput placeholder="搜索器械" value={q} onChange={(e) => setQ(e.target.value)} />
-      <div className="space-y-1.5 mt-2">
-        {list.map((t) => (
-          <button
-            key={t.id}
-            className="w-full text-left rounded-2xl border border-line p-3"
-            onClick={async () => {
-              if (!facts.profile.currentGymId) return;
-              await addGymEquipment({ gymId: facts.profile.currentGymId, equipmentTypeId: t.id });
-              toast(`已添加「${t.name}」`, "success");
-              onClose();
-            }}
-          >
-            <div className="font-medium">{t.name}</div>
-            <div className="text-xs text-muted">{t.nameJa}</div>
-          </button>
-        ))}
-      </div>
-      <Link href="/scan?manual=1" className="block text-center text-sm text-accent mt-3">
-        找不到？创建新的器械类型
-      </Link>
+      <TypePicker
+        onPick={async (t) => {
+          if (!facts.profile.currentGymId) return;
+          await addGymEquipment({ gymId: facts.profile.currentGymId, equipmentTypeId: t.id });
+          toast(`已添加「${t.name}」`, "success");
+          onClose();
+        }}
+      />
     </Sheet>
   );
 }
@@ -253,7 +239,7 @@ function Detail({ geId, onDeleted }: { geId: string; onDeleted: () => void }) {
               <span>
                 <span className="font-medium">{e.name}</span>
                 <span className="block text-xs text-muted">
-                  {REGION_NAME[primaryRegion(e) ?? "core"]} · {muscleNames(e, "primary")}
+                  {e.kind === "cardio" ? "有氧 · 按时间记录" : `${REGION_NAME[primaryRegion(e) ?? "core"]} · ${muscleNames(e, "primary")}`}
                 </span>
               </span>
               <span className="text-accent text-sm">记录 ›</span>

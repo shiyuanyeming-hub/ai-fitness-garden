@@ -8,7 +8,9 @@ export function exercisesForEquipmentType(f: Facts, equipmentTypeId: string, gym
   const linked = new Set(
     f.links.filter((l) => l.equipmentTypeId === equipmentTypeId && (!l.gymEquipmentId || l.gymEquipmentId === gymEquipmentId)).map((l) => l.exerciseId),
   );
-  const list = f.exercises.filter((e) => e.equipmentTypes.includes(equipmentTypeId) || linked.has(e.id));
+  // The floor/mat has no explicit links: offer the no-equipment strength & core moves.
+  const floor = equipmentTypeId === "mat";
+  const list = f.exercises.filter((e) => e.equipmentTypes.includes(equipmentTypeId) || linked.has(e.id) || (floor && e.equipmentTypes.length === 0 && e.kind !== "cardio"));
   // custom (user) exercises for this machine first, then by region
   return list.sort((a, b) => Number(b.isCustom) - Number(a.isCustom) || regionOrder(a) - regionOrder(b));
 }
@@ -43,6 +45,7 @@ export function machinesFor(f: Facts, ex: Exercise, gymId: string | null): GymEq
 }
 
 export function muscleNames(e: Exercise, role: "primary" | "secondary"): string {
+  if (e.kind === "cardio") return role === "primary" ? "有氧 · 按时间记录" : "";
   return e.muscles
     .filter((m) => m.role === role)
     .map((m) => MUSCLE_BY_ID[m.muscleId]?.name)
@@ -50,10 +53,12 @@ export function muscleNames(e: Exercise, role: "primary" | "secondary"): string 
     .join("、");
 }
 
-export function searchExercises(list: Exercise[], q: string, region: Region | "all"): Exercise[] {
+export function searchExercises(list: Exercise[], q: string, region: Region | "all" | "cardio"): Exercise[] {
   const t = q.trim().toLowerCase();
   return list.filter((e) => {
-    if (region !== "all" && primaryRegion(e) !== region) return false;
+    if (region === "cardio") {
+      if (e.kind !== "cardio") return false;
+    } else if (region !== "all" && primaryRegion(e) !== region) return false;
     if (!t) return true;
     return [e.name, e.nameJa, e.nameEn, e.id].some((s) => s?.toLowerCase().includes(t)) || e.muscles.some((m) => MUSCLE_BY_ID[m.muscleId]?.name.includes(t));
   });

@@ -118,13 +118,53 @@ const defs: Def[] = [
   { id: "leg_press", name: "腿举", ja: "レッグプレス", en: "Leg press", kind: "compound", pattern: "squat", eq: ["leg_press"], diff: 1, p: [["quads"], ["glutes", 0.7]], s: [["hamstrings", 0.3]] },
   { id: "leg_extension", name: "腿屈伸", ja: "レッグエクステンション", en: "Leg extension", kind: "isolation", pattern: "knee_extension", eq: ["leg_extension"], diff: 1, p: [["quads"]] },
   { id: "leg_curl", name: "腿弯举", ja: "レッグカール", en: "Leg curl", kind: "isolation", pattern: "knee_flexion", eq: ["leg_curl"], diff: 1, p: [["hamstrings"]], s: [["calves", 0.2]] },
-  { id: "goblet_squat", name: "高脚杯深蹲", ja: "ゴブレットスクワット", en: "Goblet squat", kind: "compound", pattern: "squat", eq: ["dumbbells"], diff: 1, p: [["quads"], ["glutes", 0.7]], s: [["hamstrings", 0.3]], st: [["erectors"], ["abs"]] },
+  { id: "goblet_squat", name: "高脚杯深蹲", ja: "ゴブレットスクワット", en: "Goblet squat", kind: "compound", pattern: "squat", eq: ["dumbbells", "kettlebell"], diff: 1, p: [["quads"], ["glutes", 0.7]], s: [["hamstrings", 0.3]], st: [["erectors"], ["abs"]] },
   { id: "barbell_squat", name: "杠铃深蹲", ja: "バーベルスクワット", en: "Barbell back squat", kind: "compound", pattern: "squat", eq: ["power_rack", "smith_machine"], diff: 3, p: [["quads"], ["glutes", 0.8]], s: [["hamstrings", 0.3], ["erectors", 0.4]], st: [["abs"]] },
   { id: "romanian_deadlift", name: "罗马尼亚硬拉", ja: "ルーマニアンデッドリフト", en: "Romanian deadlift", kind: "compound", pattern: "hip_hinge", eq: ["barbell", "dumbbells"], diff: 2, p: [["hamstrings"], ["glutes", 0.8]], s: [["erectors", 0.5], ["forearms", 0.3]] },
   { id: "calf_raise", name: "提踵", ja: "カーフレイズ", en: "Calf raise", kind: "isolation", pattern: "calf_raise", eq: ["calf_raise_machine", "smith_machine", "leg_press"], diff: 1, p: [["calves"]] },
+
+  // ---------------- More strength ----------------
+  { id: "incline_machine_press", name: "上斜器械推胸", ja: "インクラインチェストプレス", en: "Incline machine press", kind: "compound", pattern: "incline_push", eq: ["incline_chest_press_machine"], diff: 1, p: [["pec_upper"]], s: [["pec_mid", 0.4], ["delt_front", 0.6], ["triceps"]] },
+  { id: "machine_triceps_dip", name: "器械臂屈伸（三头）", ja: "トライセプスマシン", en: "Machine triceps dip / extension", kind: "isolation", pattern: "elbow_extension", eq: ["triceps_machine"], diff: 1, p: [["triceps"]], s: [["pec_mid", 0.3], ["delt_front", 0.2]] },
+  { id: "skull_crusher", name: "仰卧臂屈伸（碎颅）", ja: "スカルクラッシャー", en: "Skull crusher", kind: "isolation", pattern: "elbow_extension", eq: ["ez_bar", "barbell", "dumbbells"], diff: 2, p: [["triceps"]] },
+  { id: "db_overhead_extension", name: "哑铃颈后臂屈伸", ja: "ダンベルフレンチプレス", en: "Dumbbell overhead triceps extension", kind: "isolation", pattern: "elbow_extension", eq: ["dumbbells"], diff: 1, p: [["triceps"]] },
+  { id: "t_bar_row", name: "T杠划船", ja: "Tバーロー", en: "T-bar row", kind: "compound", pattern: "horizontal_pull", eq: ["t_bar_row", "landmine"], diff: 2, p: [["lats", 0.8], ["traps_mid"], ["rhomboids"]], s: [["biceps"], ["delt_rear"], ["erectors", 0.4], ["forearms", 0.3]] },
+  { id: "machine_high_row", name: "高位器械划船", ja: "ハイロー", en: "Machine high row", kind: "compound", pattern: "vertical_pull", eq: ["high_row_machine"], diff: 1, p: [["lats"]], s: [["traps_mid", 0.6], ["rhomboids", 0.5], ["biceps"], ["delt_rear", 0.3]] },
+  { id: "trx_row", name: "TRX 划船", ja: "TRXロー", en: "Suspension row", kind: "compound", pattern: "horizontal_pull", res: "bodyweight", meas: "reps_only", eq: ["trx"], diff: 1, p: [["lats", 0.8], ["traps_mid"], ["rhomboids"]], s: [["biceps"], ["delt_rear"]], st: [["deep_core"]] },
+  { id: "barbell_overhead_press", name: "杠铃站姿推举", ja: "オーバーヘッドプレス", en: "Barbell overhead press", kind: "compound", pattern: "vertical_push", eq: ["barbell", "power_rack"], diff: 2, p: [["delt_front"]], s: [["delt_side", 0.4], ["triceps"], ["traps_upper", 0.25]], st: [["abs"], ["erectors"]] },
+  { id: "landmine_press", name: "地雷管单臂推举", ja: "ランドマインプレス", en: "Landmine press", kind: "compound", pattern: "incline_push", lat: "unilateral", eq: ["landmine"], diff: 1, p: [["delt_front"], ["pec_upper", 0.7]], s: [["triceps"]], st: [["obliques"], ["deep_core"]] },
+  { id: "ab_wheel_rollout", name: "健腹轮", ja: "アブローラー", en: "Ab wheel rollout", kind: "core", pattern: "anti_extension", res: "bodyweight", meas: "reps_only", eq: ["ab_wheel"], diff: 2, p: [["abs"], ["deep_core", 0.8]], s: [["lats", 0.3]] },
+  { id: "decline_situp", name: "腹肌板仰卧起坐", ja: "デクラインシットアップ", en: "Decline sit-up", kind: "core", pattern: "trunk_flexion", res: "bodyweight", meas: "reps_only", eq: ["situp_bench"], diff: 1, p: [["abs"]], s: [["obliques", 0.3]] },
+  { id: "hack_squat", name: "哈克深蹲", ja: "ハックスクワット", en: "Hack squat", kind: "compound", pattern: "squat", eq: ["hack_squat"], diff: 1, p: [["quads"], ["glutes", 0.6]], s: [["hamstrings", 0.3]] },
+  { id: "deadlift", name: "杠铃硬拉", ja: "デッドリフト", en: "Barbell deadlift", kind: "compound", pattern: "hip_hinge", eq: ["barbell", "power_rack"], diff: 3, p: [["glutes", 0.8], ["hamstrings", 0.8], ["erectors", 0.8]], s: [["quads", 0.4], ["traps_upper", 0.3], ["forearms", 0.4], ["lats", 0.3]] },
+  { id: "bulgarian_split_squat", name: "保加利亚分腿蹲", ja: "ブルガリアンスクワット", en: "Bulgarian split squat", kind: "compound", pattern: "lunge", lat: "unilateral", eq: ["dumbbells"], diff: 2, p: [["quads"], ["glutes", 0.8]], s: [["hamstrings", 0.3]], st: [["deep_core"]] },
+  { id: "db_lunge", name: "哑铃箭步蹲", ja: "ダンベルランジ", en: "Dumbbell lunge", kind: "compound", pattern: "lunge", lat: "alternating", eq: ["dumbbells"], diff: 1, p: [["quads"], ["glutes", 0.8]], s: [["hamstrings", 0.3]] },
+  { id: "machine_hip_thrust", name: "器械臀推", ja: "ヒップスラストマシン", en: "Machine hip thrust", kind: "compound", pattern: "hip_extension", eq: ["hip_thrust_machine"], diff: 1, p: [["glutes"]], s: [["hamstrings", 0.4]] },
+  { id: "barbell_hip_thrust", name: "杠铃臀推", ja: "バーベルヒップスラスト", en: "Barbell hip thrust", kind: "compound", pattern: "hip_extension", eq: ["barbell", "smith_machine"], diff: 2, p: [["glutes"]], s: [["hamstrings", 0.4]] },
+  { id: "glute_bridge", name: "臀桥", ja: "グルートブリッジ", en: "Glute bridge", kind: "isolation", pattern: "hip_extension", res: "bodyweight", meas: "reps_only", eq: [], diff: 1, p: [["glutes"]], s: [["hamstrings", 0.4]] },
+  { id: "hip_abduction", name: "髋外展", ja: "アブダクション", en: "Hip abduction machine", kind: "isolation", pattern: "other", eq: ["hip_abductor"], diff: 1, p: [["glutes", 0.6]],
+    desc: "主要练臀中肌（计入臀肌，系数 0.6）。内收肌不在本 App 的肌群列表中，内收动作请用自定义动作记录。" },
+  { id: "glute_kickback", name: "器械后踢腿", ja: "グルートキックバック", en: "Glute kickback machine", kind: "isolation", pattern: "hip_extension", lat: "unilateral", eq: ["glute_kickback_machine"], diff: 1, p: [["glutes"]], s: [["hamstrings", 0.3]] },
+  { id: "cable_kickback", name: "绳索后踢腿", ja: "ケーブルキックバック", en: "Cable glute kickback", kind: "isolation", pattern: "hip_extension", lat: "unilateral", eq: ["functional_trainer", "single_cable"], diff: 1, p: [["glutes"]], s: [["hamstrings", 0.3]] },
+  { id: "kettlebell_swing", name: "壶铃摆荡", ja: "ケトルベルスイング", en: "Kettlebell swing", kind: "compound", pattern: "hip_hinge", eq: ["kettlebell"], diff: 2, p: [["glutes"], ["hamstrings", 0.8]], s: [["erectors", 0.5]], st: [["deep_core"], ["forearms"]] },
+
+  // ---------------- Cardio ----------------
+  // Recorded by time (minutes) + optional distance + intensity (RPE). Not mapped to muscles: cardio does not
+  // add to strength "effective sets" or muscle recovery estimates; it is tracked as minutes separately.
+  { id: "treadmill_run", name: "跑步机跑步", ja: "トレッドミル ラン", en: "Treadmill run", kind: "cardio", pattern: "other", res: "other", meas: "duration", eq: ["treadmill"], diff: 1, p: [] },
+  { id: "treadmill_incline_walk", name: "跑步机爬坡走", ja: "トレッドミル 傾斜ウォーク", en: "Treadmill incline walk", kind: "cardio", pattern: "other", res: "other", meas: "duration", eq: ["treadmill"], diff: 1, p: [] },
+  { id: "spin_bike_ride", name: "动感单车", ja: "スピンバイク", en: "Spin bike", kind: "cardio", pattern: "other", res: "other", meas: "duration", eq: ["spin_bike"], diff: 1, p: [] },
+  { id: "bike_ride", name: "健身车骑行", ja: "エアロバイク", en: "Stationary bike", kind: "cardio", pattern: "other", res: "other", meas: "duration", eq: ["upright_bike", "recumbent_bike"], diff: 1, p: [] },
+  { id: "elliptical_session", name: "椭圆机", ja: "クロストレーナー", en: "Elliptical", kind: "cardio", pattern: "other", res: "other", meas: "duration", eq: ["elliptical"], diff: 1, p: [] },
+  { id: "rowing_erg", name: "划船机（有氧）", ja: "ローイングエルゴ", en: "Rowing ergometer", kind: "cardio", pattern: "other", res: "other", meas: "duration", eq: ["rowing_ergometer"], diff: 1, p: [] },
+  { id: "stair_climb", name: "楼梯机/踏步", ja: "ステアクライマー", en: "Stair climber", kind: "cardio", pattern: "other", res: "other", meas: "duration", eq: ["stair_climber"], diff: 1, p: [] },
+  { id: "air_bike_ride", name: "风阻单车", ja: "エアバイク", en: "Air bike", kind: "cardio", pattern: "other", res: "other", meas: "duration", eq: ["air_bike"], diff: 1, p: [] },
+  { id: "ski_erg_session", name: "滑雪机", ja: "スキーエルゴ", en: "Ski erg", kind: "cardio", pattern: "other", res: "other", meas: "duration", eq: ["ski_erg"], diff: 1, p: [] },
+  { id: "battle_rope_session", name: "战绳", ja: "バトルロープ", en: "Battle rope", kind: "cardio", pattern: "other", res: "other", meas: "duration", eq: ["battle_rope"], diff: 1, p: [] },
+  { id: "jump_rope", name: "跳绳", ja: "縄跳び", en: "Jump rope", kind: "cardio", pattern: "other", res: "other", meas: "duration", eq: [], diff: 1, p: [] },
 ];
 
-export const SEED_EXERCISE_VERSION = 1;
+export const SEED_EXERCISE_VERSION = 2;
 
 export const SEED_EXERCISES: Exercise[] = defs.map((d) => ({
   id: d.id,

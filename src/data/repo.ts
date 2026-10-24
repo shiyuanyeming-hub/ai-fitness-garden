@@ -138,12 +138,14 @@ export interface CustomExerciseInput {
 export async function saveCustomExercise(input: CustomExerciseInput): Promise<Exercise> {
   const name = input.name.trim();
   if (!name) throw new Error("请输入动作名称");
-  if (!input.primary.length) throw new Error("请至少选择一个主要训练肌群");
+  const cardio = input.kind === "cardio";
+  if (!cardio && !input.primary.length) throw new Error("请至少选择一个主要训练肌群");
   const d = db();
   const existing = input.id ? await d.exercises.get(input.id) : undefined;
   const directional = input.lateralityMode === "directional";
   const lateralRule = directional ? "directional_uncertain" : "same_side";
-  const muscles: Exercise["muscles"] = [
+  // Cardio is tracked as minutes, never as muscle sets — so it never adds to strength volume or recovery.
+  const muscles: Exercise["muscles"] = cardio ? [] : [
     ...input.primary.map((m) => ({ muscleId: m, role: "primary" as const, contribution: 1, lateralityRule: (MUSCLE_BY_ID[m]?.supportsLaterality ? lateralRule : directional ? "directional_uncertain" : "center") as Exercise["muscles"][number]["lateralityRule"] })),
     ...input.secondary
       .filter((m) => !input.primary.includes(m))
@@ -155,9 +157,9 @@ export async function saveCustomExercise(input: CustomExerciseInput): Promise<Ex
     description: input.description,
     kind: input.kind,
     pattern: input.pattern ?? "other",
-    lateralityMode: input.lateralityMode,
-    resistanceType: input.resistanceType,
-    measurementType: input.measurementType,
+    lateralityMode: cardio ? "bilateral" : input.lateralityMode,
+    resistanceType: cardio ? "other" : input.resistanceType,
+    measurementType: cardio ? "duration" : input.measurementType,
     equipmentTypes: existing?.equipmentTypes ?? (input.equipmentTypeId ? [input.equipmentTypeId] : []),
     difficulty: 1,
     muscles,
@@ -219,6 +221,25 @@ export async function createCustomEquipmentType(name: string, category: CustomEq
   if (!t.name) throw new Error("请输入器械名称");
   await db().equipmentTypes.add(t);
   return t;
+}
+
+/**
+ * New cardio machine category (e.g. 动感单车 not in the catalog): creates the type AND a matching
+ * cardio exercise linked to it, so the user never has to invent "exercises" for a bike.
+ */
+export async function createCustomCardioEquipment(name: string) {
+  const t = await createCustomEquipmentType(name, "cardio", false);
+  const ex = await saveCustomExercise({
+    name: t.name,
+    kind: "cardio",
+    lateralityMode: "bilateral",
+    resistanceType: "other",
+    measurementType: "duration",
+    primary: [],
+    secondary: [],
+    equipmentTypeId: t.id,
+  });
+  return { type: t, exercise: ex };
 }
 
 // ---------------------------------------------------------------- gyms & equipment
@@ -535,7 +556,7 @@ export async function addExerciseToSession(
   const lanes = lanesFor(ex);
   for (const lane of lanes) {
     const fromLast = last?.sets.filter((s) => s.side === lane.side && s.movementDirection === lane.dir && s.setType !== "warmup") ?? [];
-    const n = fromLast.length || opts.prefill?.sets || 3;
+    const n = fromLast.length || opts.prefill?.sets || (ex.kind === "cardio" ? 1 : 3);
     for (let i = 0; i < n; i++) {
       const src = fromLast[i] ?? fromLast[fromLast.length - 1];
       sets.push(
@@ -543,8 +564,10 @@ export async function addExerciseToSession(
           loadKind: src?.loadKind ?? kind,
           loadValue: src?.loadValue ?? opts.prefill?.load ?? null,
           loadUnit: src?.loadUnit ?? (kind === "band" ? "level" : kind === "bodyweight" ? null : "kg"),
-          reps: src?.reps ?? opts.prefill?.reps ?? null,
+          reps: ex.kind === "cardio" ? null : src?.reps ?? opts.prefill?.reps ?? null,
           durationSeconds: src?.durationSeconds ?? null,
+          distanceM: src?.distanceM ?? null,
+          rpe: ex.kind === "cardio" ? src?.rpe ?? null : null,
         }),
       );
     }
@@ -678,6 +701,8 @@ export async function addSet(weId: string, side: SetSide, dir: MovementDirection
     loadUnit: last?.loadUnit ?? "kg",
     reps: last?.reps ?? null,
     durationSeconds: last?.durationSeconds ?? null,
+    distanceM: last?.distanceM ?? null,
+    rpe: last?.rpe ?? null,
     setType: last?.setType === "warmup" ? "working" : last?.setType ?? "working",
     ...override,
   });

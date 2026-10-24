@@ -23,7 +23,7 @@ export function ExercisePicker({ open, onClose, onPick, sessionId }: { open: boo
   const inSession = new Set(derived.bundles.find((b) => b.session.id === sessionId)?.exercises.map((e) => e.exerciseId) ?? []);
   const [tab, setTab] = useState<"rec" | "machine" | "search">(rec.exercises.length ? "rec" : "machine");
   const [q, setQ] = useState("");
-  const [region, setRegion] = useState<Region | "all">("all");
+  const [region, setRegion] = useState<Region | "all" | "cardio">("all");
   const [machine, setMachine] = useState<GymEquipment | null>(null);
 
   const machines = useMemo(
@@ -138,6 +138,9 @@ export function ExercisePicker({ open, onClose, onPick, sessionId }: { open: boo
                     {r.name}
                   </Chip>
                 ))}
+                <Chip active={region === "cardio"} onClick={() => setRegion("cardio")}>
+                  有氧
+                </Chip>
               </div>
               <ExerciseList items={results} inSession={inSession} onPick={(id) => pickExercise(id, null)} />
               <Link

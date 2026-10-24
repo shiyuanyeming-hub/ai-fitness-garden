@@ -57,7 +57,8 @@ export function ExerciseCard({ we, ex, sets, restSec, lastSummary, equipmentName
   const done = sets.filter((s) => s.completedAt).length;
   const kind = sets[0]?.loadKind ?? (ex.resistanceType === "assisted" ? "assistance" : ex.resistanceType === "bodyweight" ? "bodyweight" : ex.resistanceType === "band" ? "band" : "external");
   const unit = sets.find((s) => s.loadUnit)?.loadUnit ?? (kind === "band" ? "level" : "kg");
-  const primary = ex.muscles.filter((m) => m.role === "primary").map((m) => MUSCLE_BY_ID[m.muscleId]?.name).join("、");
+  const cardio = ex.kind === "cardio";
+  const primary = cardio ? "有氧" : ex.muscles.filter((m) => m.role === "primary").map((m) => MUSCLE_BY_ID[m.muscleId]?.name).join("、");
 
   async function finishExercise() {
     const pending = sets.filter((s) => !s.completedAt);
@@ -72,19 +73,18 @@ export function ExerciseCard({ we, ex, sets, restSec, lastSummary, equipmentName
   return (
     <section className="card overflow-hidden" data-testid={`exercise-${ex.id}`}>
       <button className="w-full flex items-center gap-3 p-3 text-left" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-        <PhotoThumb photoId={photoId ?? null} size={48} fallback={ex.kind === "core" ? "🎯" : "🏋️"} />
+        <PhotoThumb photoId={photoId ?? null} size={48} fallback={cardio ? "🚴" : ex.kind === "core" ? "🎯" : "🏋️"} />
         <div className="min-w-0 flex-1">
           <div className="font-semibold truncate">{ex.name}</div>
           <div className="text-xs text-muted truncate">
-            {equipmentName ? `${equipmentName} · ` : ""}
-            {primary}
+            {[equipmentName && equipmentName !== ex.name ? equipmentName : null, primary].filter(Boolean).join(" · ")}
           </div>
         </div>
         <div className="text-right shrink-0">
           <div className={cx("text-sm font-semibold num", done ? "text-accent" : "text-faint")}>
             {done}/{sets.length}
           </div>
-          <div className="text-[11px] text-faint">{we.completedAt ? "已完成" : "组"}</div>
+          <div className="text-[11px] text-faint">{we.completedAt ? "已完成" : cardio ? "段" : "组"}</div>
         </div>
       </button>
 
@@ -118,7 +118,7 @@ export function ExerciseCard({ we, ex, sets, restSec, lastSummary, equipmentName
                 ]}
               />
             )}
-            {(kind === "external" || kind === "assistance") && (
+            {!cardio && (kind === "external" || kind === "assistance") && (
               <Segmented<LoadUnit>
                 size="sm"
                 className={isUnilateral ? "w-28" : "w-28 ml-auto"}
@@ -212,6 +212,34 @@ interface LaneProps {
 }
 
 function Lane({ label, rows, ex, restSec, kind, unit, onAdd, onError }: LaneProps) {
+  if (ex.kind === "cardio")
+    return (
+      <div>
+        <div className="grid grid-cols-[34px_1fr_1fr_64px_44px_28px] gap-1.5 items-center text-[11px] text-faint px-1 mb-1">
+          <span>段</span>
+          <span>分钟</span>
+          <span>公里（可选）</span>
+          <span>强度</span>
+          <span />
+          <span />
+        </div>
+        <div className="space-y-1.5">
+          {rows.map((group) => (
+            <CardioRow key={group[0].id} s={group[0]} onError={onError} />
+          ))}
+        </div>
+        <button
+          className="mt-2 w-full h-10 rounded-xl border border-dashed border-line text-sm text-muted active:bg-surface-2"
+          onClick={async () => {
+            await onAdd();
+            haptic(8);
+          }}
+        >
+          ＋ 再加一段
+        </button>
+        <p className="text-[11px] text-faint mt-1.5 px-1">强度 1–10：4 轻松能聊天 · 6 有点喘 · 8 很吃力。有氧按分钟单独统计，不计入肌群训练量和恢复估计。</p>
+      </div>
+    );
   return (
     <div>
       {label && <div className="text-[12px] font-semibold text-muted mb-1 px-1">{label}</div>}
@@ -237,6 +265,122 @@ function Lane({ label, rows, ex, restSec, kind, unit, onAdd, onError }: LaneProp
       >
         ＋ 加一组（复制上一组）
       </button>
+    </div>
+  );
+}
+
+/** Cardio bout: minutes (stored as seconds), optional km (stored as metres), intensity as RPE 1–10. */
+function CardioRow({ s, onError }: { s: WorkoutSet; onError: (m: string) => void }) {
+  const min = useDraft(s.durationSeconds == null ? null : Math.round((s.durationSeconds / 60) * 10) / 10);
+  const km = useDraft(s.distanceM == null ? null : Math.round(s.distanceM) / 1000);
+  const done = !!s.completedAt;
+  const [more, setMore] = useState(false);
+
+  async function patch(p: Partial<WorkoutSet>) {
+    try {
+      await updateSet(s.id, p);
+    } catch (e) {
+      onError(e instanceof ValidationError ? e.message : "保存失败");
+      throw e;
+    }
+  }
+  async function commit() {
+    const m = parseNum(min.s);
+    const k = parseNum(km.s);
+    if (Number.isNaN(m) || Number.isNaN(k)) {
+      onError("请输入数字");
+      throw new Error("nan");
+    }
+    const p: Partial<WorkoutSet> = {};
+    const sec = m == null ? null : Math.round(m * 60);
+    const metres = k == null ? null : Math.round(k * 1000);
+    if (sec !== s.durationSeconds) p.durationSeconds = sec;
+    if (metres !== s.distanceM) p.distanceM = metres;
+    if (Object.keys(p).length) await patch(p);
+  }
+  async function toggle() {
+    try {
+      await commit();
+      if (!done && !(parseNum(min.s) ?? 0) && !(parseNum(km.s) ?? 0)) {
+        onError("先填时间（分钟）");
+        return;
+      }
+      await completeSet(s.id, !done);
+      if (!done) haptic(12);
+    } catch (e) {
+      if (e instanceof ValidationError) onError(e.message);
+    }
+  }
+  const cls = cx(
+    "h-11 w-full rounded-xl text-center num text-[17px] border outline-none focus:border-accent",
+    done ? "bg-accent-soft border-transparent" : "bg-surface-2 border-line",
+  );
+  const field = (d: ReturnType<typeof useDraft>, label: string, placeholder: string) => (
+    <input
+      className={cls}
+      inputMode="decimal"
+      placeholder={placeholder}
+      aria-label={label}
+      value={d.s}
+      onFocus={(e) => {
+        d.focused.current = true;
+        e.target.select();
+      }}
+      onChange={(e) => d.setS(e.target.value)}
+      onBlur={() => {
+        d.focused.current = false;
+        commit().catch(() => {});
+      }}
+      onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+    />
+  );
+  return (
+    <div>
+      <div className="grid grid-cols-[34px_1fr_1fr_64px_44px_28px] gap-1.5 items-center">
+        <span className="h-11 rounded-xl grid place-items-center text-sm font-semibold bg-surface-2 text-muted">{s.setIndex}</span>
+        {field(min, "分钟", "例如 30")}
+        {field(km, "公里", "—")}
+        <select
+          className={cx(cls, "text-[15px] px-0")}
+          value={s.rpe ?? ""}
+          aria-label="强度（可选）"
+          onChange={(e) => patch({ rpe: e.target.value === "" ? null : Number(e.target.value) }).catch(() => {})}
+        >
+          <option value="">—</option>
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={toggle}
+          className={cx("h-11 rounded-xl grid place-items-center text-lg font-bold transition", done ? "bg-accent text-accent-ink" : "bg-surface-2 border border-line text-faint")}
+          aria-label={done ? "取消完成" : "完成这一组"}
+          aria-pressed={done}
+        >
+          ✓
+        </button>
+        <button onClick={() => setMore((m) => !m)} className="h-11 text-faint text-lg" aria-label="更多">
+          ⋯
+        </button>
+      </div>
+      {more && (
+        <div className="mt-1.5 mb-2 ml-9 rounded-xl bg-surface-2 p-2.5 space-y-2 text-sm">
+          <input
+            className="h-9 w-full rounded-lg bg-surface border border-line px-2"
+            placeholder="备注（可选，例如 阻力档位、坡度、课程名）"
+            defaultValue={s.notes ?? ""}
+            onBlur={(e) => patch({ notes: e.target.value || undefined }).catch(() => {})}
+          />
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-faint">{done ? `已记录：${fmtSet(s)}` : "未打勾不会计入"}</span>
+            <button className="text-attention text-sm" onClick={() => deleteSet(s.id)}>
+              删除这一段
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

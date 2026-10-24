@@ -10,6 +10,8 @@ export interface SessionSummary {
   primaryMuscles: string[];
   secondaryMuscles: string[];
   totalWorkingSets: number;
+  /** cardio minutes in this session (tracked separately from strength sets) */
+  cardioMinutes: number;
   text: string;
 }
 
@@ -23,6 +25,7 @@ export function summarizeSession(bundle: SessionBundle, exerciseById: Record<str
   const primary = new Set<string>();
   const secondary = new Set<string>();
   let totalWorking = 0;
+  let cardioSec = 0;
 
   for (const we of [...exercises].sort((a, b) => a.orderIndex - b.orderIndex)) {
     const ex = exerciseById[we.exerciseId];
@@ -31,6 +34,14 @@ export function summarizeSession(bundle: SessionBundle, exerciseById: Record<str
     const working = done.filter((s) => s.setType !== "warmup");
     const warm = done.length - working.length;
     if (!done.length) continue;
+    if (ex.kind === "cardio") {
+      const sec = done.reduce((a, x) => a + (x.durationSeconds ?? 0), 0);
+      const m = done.reduce((a, x) => a + (x.distanceM ?? 0), 0);
+      cardioSec += sec;
+      const parts = [sec ? `${Math.round(sec / 60)}分钟` : "", m ? `${Math.round(m / 100) / 10}km` : ""].filter(Boolean);
+      out.push({ exerciseId: ex.id, name: ex.name, workingSets: 0, warmupSets: 0, detail: ` ${parts.join(" ")}` });
+      continue;
+    }
     const left = working.filter((s) => s.side === "left").length;
     const right = working.filter((s) => s.side === "right").length;
     const both = working.filter((s) => s.side === "both").length;
@@ -58,9 +69,12 @@ export function summarizeSession(bundle: SessionBundle, exerciseById: Record<str
     session.completedAt != null ? Math.max(0, Math.round((Date.parse(session.completedAt) - Date.parse(session.startedAt)) / 60000)) : null;
   const primaryMuscles = [...primary].map((id) => MUSCLE_BY_ID[id]?.name ?? id);
   const secondaryMuscles = [...secondary].map((id) => MUSCLE_BY_ID[id]?.name ?? id);
+  const cardioMinutes = Math.round(cardioSec / 60);
   const text = out.length
-    ? `今日完成：${out.map((e) => `${e.name}${e.detail}`).join("，")}。主要训练：${primaryRegions.map((r) => REGION_NAME[r]).join("、")}。` +
-      (secondaryMuscles.length ? `辅助参与：${secondaryMuscles.join("、")}。` : "")
+    ? `今日完成：${out.map((e) => `${e.name}${e.detail}`).join("，")}。` +
+      (primaryRegions.length ? `主要训练：${primaryRegions.map((r) => REGION_NAME[r]).join("、")}。` : "") +
+      (secondaryMuscles.length ? `辅助参与：${secondaryMuscles.join("、")}。` : "") +
+      (cardioMinutes ? `有氧共 ${cardioMinutes} 分钟。` : "")
     : "这次训练还没有完成的组。";
-  return { durationMin, exercises: out, primaryRegions, primaryMuscles, secondaryMuscles, totalWorkingSets: totalWorking, text };
+  return { durationMin, exercises: out, primaryRegions, primaryMuscles, secondaryMuscles, totalWorkingSets: totalWorking, cardioMinutes, text };
 }

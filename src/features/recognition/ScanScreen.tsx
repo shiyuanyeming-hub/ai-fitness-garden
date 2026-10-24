@@ -3,13 +3,14 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppReady } from "@/features/app-data";
-import { Button, Card, Chip, Field, TextInput, cx, useToast } from "@/components/ui";
+import { Button, Card, Chip, cx, useToast } from "@/components/ui";
 import { prepareImage, recognizeImage, confirmRecognition, type PreparedImage, type RecognizeOutcome } from "./client";
 import { exercisesForEquipmentType, equipmentName } from "@/features/catalog";
 import { ExerciseList } from "@/features/workout/ExercisePicker";
-import { addExerciseToSession, addGymEquipment, createCustomEquipmentType, savePhoto, startSession } from "@/data/repo";
+import { addExerciseToSession, addGymEquipment, savePhoto, startSession } from "@/data/repo";
 import { db, type GymEquipment } from "@/data/db";
 import type { EquipmentType } from "@/data/seed/equipment";
+import { TypePicker } from "@/features/equipment/TypePicker";
 
 type Step = "capture" | "processing" | "equipment" | "manual" | "exercise";
 
@@ -111,13 +112,13 @@ export function ScanScreen() {
 
   async function goCustom() {
     const ge = await ensureMachine();
-    router.push(`/exercise?new=1&eq=${ge.equipmentTypeId}&ge=${ge.id}${sessionParam ? `&session=${sessionParam}` : "&then=workout"}`);
+    router.push(`/exercise?new=1&eq=${ge.equipmentTypeId}&ge=${ge.id}${type?.category === "cardio" ? "&kind=cardio" : ""}${sessionParam ? `&session=${sessionParam}` : "&then=workout"}`);
   }
 
   return (
     <div className="pt-safe">
       <div className="flex items-center justify-between py-3">
-        <button className="text-accent text-[15px]" onClick={() => (step === "capture" ? router.back() : step === "exercise" ? setStep("equipment") : setStep("capture"))}>
+        <button className="text-accent text-[15px]" onClick={() => (step === "capture" ? router.back() : step === "exercise" ? setStep(outcome?.ok ? "equipment" : "manual") : setStep("capture"))}>
           ‹ {step === "capture" ? "返回" : "上一步"}
         </button>
         <div className="font-semibold">{step === "exercise" ? "选择动作" : "添加器械"}</div>
@@ -247,9 +248,13 @@ export function ScanScreen() {
         <ManualEquipment
           error={outcome && !outcome.ok ? outcome.message : null}
           onRetry={img ? () => onFile(img.blob as File) : undefined}
-          onPick={(t) => {
+          onPick={(t, preselect) => {
             setTypeId(t.id);
             setExisting(null);
+            const exs = exercisesForEquipmentType(facts, t.id);
+            // Cardio machines usually have exactly one "exercise" (the machine itself) — preselect it.
+            const own = exs.filter((e) => e.kind === "cardio" && e.equipmentTypes[0] === t.id);
+            setExerciseId(preselect ?? (t.category === "cardio" ? (exs.length === 1 ? exs[0].id : own[0]?.id ?? null) : null));
             setStep("exercise");
           }}
         />
@@ -257,19 +262,22 @@ export function ScanScreen() {
 
       {step === "exercise" && type && (
         <div>
-          <div className="text-sm text-muted">识别到：{existing ? equipmentName(facts, existing) : type.name}</div>
+          <div className="text-sm text-muted">{outcome?.ok ? "识别到" : "器械"}：{existing ? equipmentName(facts, existing) : type.name}</div>
           <h2 className="text-xl font-semibold mt-0.5 mb-3">你这次做的是哪个动作？</h2>
           {orderedEx.length ? (
             <ExerciseList items={orderedEx} selected={exerciseId} onPick={setExerciseId} hint={hint} />
           ) : (
-            <p className="text-sm text-muted">这个器械还没有关联动作，请创建自定义动作。</p>
+            <p className="text-sm text-muted">这个器械还没有关联动作。可以直接保存器械，或创建一个动作。</p>
           )}
           <Button variant="ghost" block className="mt-2" onClick={goCustom}>
             都不是 / 自定义动作
           </Button>
-          <div className="sticky bottom-0 pt-3 pb-safe bg-bg">
-            <Button variant="primary" size="lg" block disabled={!exerciseId || busy} onClick={() => confirmAll(true)}>
-              {exerciseId ? "开始记录" : "请选择一个动作"}
+          <div className="sticky bottom-0 pt-3 pb-safe bg-bg space-y-2">
+            <Button variant="primary" size="lg" block disabled={!exerciseId || busy} onClick={() => confirmAll(true)} data-testid="start-logging">
+              {exerciseId ? "开始记录" : "选择一个动作后开始记录"}
+            </Button>
+            <Button block disabled={busy} onClick={() => confirmAll(false)} data-testid="save-equipment-only">
+              只保存器械，先不记录
             </Button>
           </div>
         </div>
@@ -278,14 +286,7 @@ export function ScanScreen() {
   );
 }
 
-function ManualEquipment({ error, onRetry, onPick }: { error: string | null; onRetry?: () => void; onPick: (t: EquipmentType) => void }) {
-  const { facts } = useAppReady();
-  const toast = useToast();
-  const [q, setQ] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [name, setName] = useState("");
-  const [multi, setMulti] = useState(true);
-  const list = facts.equipmentTypes.filter((t) => !q || [t.name, t.nameJa, t.nameEn].some((s) => s?.toLowerCase().includes(q.toLowerCase())));
+function ManualEquipment({ error, onRetry, onPick }: { error: string | null; onRetry?: () => void; onPick: (t: EquipmentType, preselect?: string) => void }) {
   return (
     <div className="space-y-3">
       {error && (
@@ -304,50 +305,7 @@ function ManualEquipment({ error, onRetry, onPick }: { error: string | null; onR
           </div>
         </Card>
       )}
-      <TextInput placeholder="搜索器械（中文 / 日本語 / English）" value={q} onChange={(e) => setQ(e.target.value)} />
-      <div className="space-y-1.5">
-        {list.map((t) => (
-          <button key={t.id} className="w-full text-left rounded-2xl border border-line bg-surface p-3" onClick={() => onPick(t)}>
-            <div className="font-medium">{t.name}</div>
-            <div className="text-xs text-muted">
-              {t.nameJa} {t.isMultifunctional ? "· 多功能" : ""}
-            </div>
-          </button>
-        ))}
-      </div>
-      {!creating ? (
-        <Button block variant="ghost" onClick={() => setCreating(true)}>
-          ＋ 创建新的器械类型
-        </Button>
-      ) : (
-        <Card className="space-y-3">
-          <Field label="器械名称">
-            <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="例如：胸推/划船二合一机" />
-          </Field>
-          <div className="flex gap-2">
-            <Chip active={multi} onClick={() => setMulti(true)}>
-              多功能（可做多个动作）
-            </Chip>
-            <Chip active={!multi} onClick={() => setMulti(false)}>
-              固定器械
-            </Chip>
-          </div>
-          <Button
-            variant="primary"
-            block
-            onClick={async () => {
-              try {
-                const t = await createCustomEquipmentType(name, multi ? "cable" : "machine", multi);
-                onPick(t);
-              } catch (e) {
-                toast((e as Error).message, "error");
-              }
-            }}
-          >
-            创建并继续
-          </Button>
-        </Card>
-      )}
+      <TypePicker onPick={onPick} />
     </div>
   );
 }

@@ -21,12 +21,19 @@ export function fmtSet(s: Pick<WorkoutSet, "loadKind" | "loadValue" | "loadUnit"
   else if (s.loadKind === "bodyweight") parts.push(s.loadValue ? `自重+${s.loadValue}${s.loadUnit ?? "kg"}` : "自重");
   else if (s.loadValue != null) parts.push(`${s.loadKind === "assistance" ? "辅助" : ""}${s.loadValue}${s.loadUnit === "lb" ? "lb" : s.loadUnit === "level" ? "档" : "kg"}`);
   if (s.reps != null) parts.push(`${s.reps}次`);
-  if (s.durationSeconds != null) parts.push(`${s.durationSeconds}秒`);
-  if (s.distanceM != null) parts.push(`${s.distanceM}m`);
-  let out = parts.join(" × ");
+  if (s.durationSeconds != null) parts.push(fmtDuration(s.durationSeconds));
+  if (s.distanceM != null) parts.push(s.distanceM >= 1000 ? `${Math.round(s.distanceM / 10) / 100}km` : `${s.distanceM}m`);
+  let out = parts.join(s.reps == null && s.loadValue == null ? " · " : " × ");
   if (s.rir != null) out += ` · RIR ${s.rir}`;
-  else if (s.rpe != null) out += ` · RPE ${s.rpe}`;
+  else if (s.rpe != null) out += ` · ${s.reps == null && s.loadValue == null ? "强度" : "RPE"} ${s.rpe}`;
   return out;
+}
+
+export function fmtDuration(sec: number): string {
+  if (sec < 60) return `${sec}秒`;
+  const m = Math.floor(sec / 60);
+  const r = sec % 60;
+  return r ? `${m}分${r}秒` : `${m}分钟`;
 }
 
 export function laneLabel(side: string, dir: string): string {

@@ -20,7 +20,7 @@ export function ExerciseScreen() {
 function Library() {
   const { facts } = useAppReady();
   const [q, setQ] = useState("");
-  const [region, setRegion] = useState<Region | "all">("all");
+  const [region, setRegion] = useState<Region | "all" | "cardio">("all");
   const list = searchExercises(facts.exercises, q, region);
   return (
     <div>
@@ -35,6 +35,9 @@ function Library() {
             {r.name}
           </Chip>
         ))}
+        <Chip active={region === "cardio"} onClick={() => setRegion("cardio")}>
+          有氧
+        </Chip>
       </div>
       <div className="space-y-2">
         {list.map((e) => (
@@ -86,7 +89,8 @@ function ExerciseForm() {
   const [name, setName] = useState(existing?.name ?? "");
   const [primary, setPrimary] = useState<string[]>(existing?.muscles.filter((m) => m.role === "primary").map((m) => m.muscleId) ?? []);
   const [secondary, setSecondary] = useState<string[]>(existing?.muscles.filter((m) => m.role === "secondary").map((m) => m.muscleId) ?? []);
-  const [kind, setKind] = useState<Exercise["kind"]>(existing?.kind ?? "isolation");
+  const [kind, setKind] = useState<Exercise["kind"]>(existing?.kind ?? (params.get("kind") === "cardio" ? "cardio" : "isolation"));
+  const cardio = kind === "cardio";
   const [lat, setLat] = useState<Exercise["lateralityMode"]>(existing?.lateralityMode ?? "bilateral");
   const [res, setRes] = useState<Exercise["resistanceType"]>(existing?.resistanceType ?? "external_load");
   const [meas, setMeas] = useState<Exercise["measurementType"]>(existing?.measurementType ?? "reps_weight");
@@ -137,23 +141,31 @@ function ExerciseForm() {
           <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="例如：单臂绳索Y字上举" autoFocus={!existing} />
         </Field>
 
-        <MusclePicker
-          label="主要训练肌群（必选）"
-          value={primary}
-          onToggle={(id) => toggle(primary, setPrimary, id, secondary, setSecondary)}
-        />
-        <MusclePicker
-          label="辅助训练肌群（可选）"
-          value={secondary}
-          onToggle={(id) => toggle(secondary, setSecondary, id, primary, setPrimary)}
-        />
-
-        <Opt label="左右记录方式" value={lat} set={setLat} labels={LATERALITY_LABEL} hint={lat === "directional" ? "方向性：记录向左/向右，不会把方向当成单侧肌群" : lat === "unilateral" ? "单侧：左右分别记录，左右组数可以不同" : undefined} />
         <Opt label="动作类型" value={kind} set={setKind} labels={KIND_LABEL} />
-        <Opt label="阻力形式" value={res} set={setRes} labels={RESISTANCE_LABEL} hint={res === "assisted" ? "辅助重量越大越轻松，不会当作普通负重" : undefined} />
-        <Opt label="计量方式" value={meas} set={setMeas} labels={MEASUREMENT_LABEL} />
+        {cardio ? (
+          <p className="text-sm text-muted rounded-xl bg-surface-2 p-3">
+            有氧动作按「分钟 / 公里 / 强度」记录，不需要选肌群；有氧时间单独统计，不计入肌群训练量和恢复估计。
+          </p>
+        ) : (
+          <>
+            <MusclePicker
+              label="主要训练肌群（必选）"
+              value={primary}
+              onToggle={(id) => toggle(primary, setPrimary, id, secondary, setSecondary)}
+            />
+            <MusclePicker
+              label="辅助训练肌群（可选）"
+              value={secondary}
+              onToggle={(id) => toggle(secondary, setSecondary, id, primary, setPrimary)}
+            />
 
-        <p className="text-xs text-faint">主要肌群按 1 组计，辅助肌群按 0.5 组计（估算系数）。</p>
+            <Opt label="左右记录方式" value={lat} set={setLat} labels={LATERALITY_LABEL} hint={lat === "directional" ? "方向性：记录向左/向右，不会把方向当成单侧肌群" : lat === "unilateral" ? "单侧：左右分别记录，左右组数可以不同" : undefined} />
+            <Opt label="阻力形式" value={res} set={setRes} labels={RESISTANCE_LABEL} hint={res === "assisted" ? "辅助重量越大越轻松，不会当作普通负重" : undefined} />
+            <Opt label="计量方式" value={meas} set={setMeas} labels={MEASUREMENT_LABEL} />
+
+            <p className="text-xs text-faint">主要肌群按 1 组计，辅助肌群按 0.5 组计（估算系数）。</p>
+          </>
+        )}
         <Button variant="primary" size="lg" block onClick={save} disabled={busy}>
           {existing ? "保存修改" : sessionId || then ? "保存并开始记录" : "保存动作"}
         </Button>

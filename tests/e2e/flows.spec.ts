@@ -55,7 +55,7 @@ test("测试1+3：拍照多功能器械 → 选单臂侧平举 → 左右不同�
   await page.getByRole("button", { name: "确认器械，选择动作" }).click();
   await expect(page.getByText("你这次做的是哪个动作？")).toBeVisible();
   // No exercise is pre-recorded: the start button needs an explicit choice
-  await expect(page.getByRole("button", { name: "请选择一个动作" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "选择一个动作后开始记录" })).toBeDisabled();
   await page.getByRole("listitem").filter({ hasText: "单臂绳索侧平举" }).click();
   await page.getByRole("button", { name: "开始记录" }).click();
 
@@ -212,4 +212,43 @@ test("AI 连接测试与每日 AI 建议（模拟模式）", async ({ page }) =>
     // prefilled sets are not facts until ticked
     await expect(page.getByRole("button", { name: "取消完成" })).toHaveCount(0);
   }
+});
+
+test("手动新建库里没有的有氧器械 → 不用选动作直接记录分钟", async ({ page }) => {
+  await ready(page, "/scan?manual=1");
+  await page.getByTestId("type-search").fill("攀爬机");
+  await expect(page.getByText("没有找到「攀爬机」")).toBeVisible();
+  await page.getByTestId("create-type").click();
+  await expect(page.getByTestId("new-type-name")).toHaveValue("攀爬机");
+  await page.getByTestId("new-type-cardio").click();
+  await page.getByTestId("create-type-confirm").click();
+  // exercise auto-created and preselected
+  await expect(page.getByTestId("start-logging")).toHaveText("开始记录");
+  await page.getByTestId("start-logging").click();
+  await expect(page).toHaveURL(/\/workout/);
+  await page.getByLabel("分钟").first().fill("20");
+  await page.getByLabel("公里").first().fill("1.5");
+  await page.getByLabel("分钟").first().blur();
+  await tick(page);
+  await finishWorkout(page);
+  await expect(page.getByText(/攀爬机 20分钟 1\.5km/)).toBeVisible();
+});
+
+test("库里已有的动感单车：自动选中，直接开始记录", async ({ page }) => {
+  await ready(page, "/scan?manual=1");
+  await page.getByRole("button", { name: "有氧", exact: true }).click();
+  await page.getByRole("button", { name: /^动感单车/ }).click();
+  await expect(page.getByTestId("start-logging")).toHaveText("开始记录");
+});
+
+test("手动新建力量器械：没有动作时可以只保存器械", async ({ page }) => {
+  await ready(page, "/scan?manual=1");
+  await page.getByTestId("create-type").click();
+  await page.getByTestId("new-type-name").fill("胸推划船二合一机");
+  await page.getByTestId("new-type-fixed").click();
+  await page.getByTestId("create-type-confirm").click();
+  await expect(page.getByText("这个器械还没有关联动作")).toBeVisible();
+  await page.getByTestId("save-equipment-only").click();
+  await expect(page).toHaveURL(/\/equipment/);
+  await expect(page.getByText("胸推划船二合一机").first()).toBeVisible();
 });

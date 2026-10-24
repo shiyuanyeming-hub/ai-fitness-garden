@@ -42,6 +42,8 @@ export interface CoachInput {
     daysSinceLastSession: number | null;
     sessionsThisWeek: number;
     trainedToday: boolean;
+    /** cardio minutes in the last 7 days (not part of strength volume) */
+    cardioMinutes7d?: number;
     topExercises: { name: string; times: number }[];
   };
   recent: { date: string; durationMin: number | null; exercises: { name: string; workingSets: number; best: string | null }[] }[];

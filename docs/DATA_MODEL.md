@@ -9,9 +9,9 @@
 | `profile` | UserProfile + Goal | 单行 `id="me"`：身高、体重、经验、时区、每周天数、每次时长、部位优先级（重点/维持/暂不优先）、目标列表、开始/目标日期、排除动作、伤痛限制、当前健身房 |
 | `trainingPlans` | TrainingPlan | 计划记录（开始/结束/状态）。阶段内容由 `buildPlan(profile)` 派生 |
 | `gyms` | Gym | |
-| `equipmentTypes` | Equipment（自定义部分） | 内置 29 类在代码里（`seed/equipment.ts`），用户新建的存这里 |
+| `equipmentTypes` | Equipment（自定义部分） | 内置 52 类在代码里（含有氧器械）（`seed/equipment.ts`），用户新建的存这里 |
 | `gymEquipment` | GymEquipment | 某健身房的一台实际器械：类型、自定义名、品牌、型号、照片、可用、收藏、最近使用 |
-| `exercises` | Exercise（自定义部分） | 内置 61 个在代码里；自定义动作含完整肌群映射 |
+| `exercises` | Exercise（自定义部分） | 内置 94 个在代码里；自定义力量动作含完整肌群映射，自定义有氧动作不映射肌群 |
 | `equipmentExercises` | EquipmentExercise（自定义部分） | 用户建立的器械↔动作关联，可限定到某台器械。内置关联在 `Exercise.equipmentTypes` |
 | `sessions` | WorkoutSession | status: active/completed；source: planned/free/imported；recommendationId；主观疲劳；备注 |
 | `workoutExercises` | WorkoutExercise | 一次训练中的一个动作；gymEquipmentId（可空）；entryMode（左右相同/分别，仅 UI） |
@@ -50,6 +50,7 @@
 
 - 双侧动作：每组一行，`side=both, movementDirection=none`。
 - 单侧 / 左右交替：左右各自一条「泳道」，`side=left|right`，`setIndex` 在各自泳道内编号，两侧组数可以不同。
+- 有氧（`kind = cardio`）：每一「段」一行，`durationSeconds`（界面按分钟输入）、可选 `distanceM`（界面按公里）、可选 `rpe` 作为强度 1–10。
 - 方向性（躯干旋转、Pallof、伐木）：`side=both, movementDirection=left|right`。方向不等于肌群侧别，肌群映射用 `directional_uncertain` 规则，只记核心整体负荷。
 
 ## 备份格式
