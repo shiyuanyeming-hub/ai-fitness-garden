@@ -12,6 +12,7 @@ import { recognitionStatus, testAiConnection, type AiStatus, type AiTestResult }
 import { db } from "@/data/db";
 import { diffDays } from "@/core/time";
 import { searchExercises } from "@/features/catalog";
+import { loadShareSettings, publishShare, unpublishShare, SHARE_META } from "@/features/share/client";
 
 export function MeScreen() {
   return (
@@ -23,6 +24,7 @@ export function MeScreen() {
       <PlanCard />
       <PreferencesCard />
       <BackupCard />
+      <ShareCard />
       <AiCard />
       <SectionTitle>关于</SectionTitle>
       <Card className="!p-0 divide-y divide-line">
@@ -592,6 +594,102 @@ function LocalDataInfo() {
         本机已有：训练 {counts?.sessions ?? "…"} 次 · 已完成组 {counts?.sets ?? "…"} 组 · 器械 {counts?.equipment ?? "…"} 台
       </div>
       <div className="text-faint mt-0.5">主屏幕 App、Safari 标签页、不同网址的数据各自独立，互相看不到。</div>
+    </div>
+  );
+}
+
+function ShareCard() {
+  const toast = useToast();
+  const { facts } = useAppReady();
+  const st = useLiveQuery(loadShareSettings, []);
+  const [title, setTitle] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const url = typeof location !== "undefined" ? `${location.origin}/share` : "/share";
+  const shownTitle = title ?? st?.title ?? "我的训练";
+  if (!st) return null;
+
+  const turnOn = async () => {
+    setBusy(true);
+    await setMeta(SHARE_META.on, true);
+    await setMeta(SHARE_META.title, shownTitle.trim() || "我的训练");
+    const r = await publishShare(facts, { force: true });
+    setBusy(false);
+    if (r.ok) toast("已开启：以后每次更新训练都会自动同步到网页", "success");
+    else toast(r.message, "error");
+  };
+  const turnOff = async () => {
+    if (!confirmAsync("关闭公开分享并撤下网页上的记录？（本机数据不受影响）")) return;
+    setBusy(true);
+    const r = await unpublishShare();
+    if (r.ok) await setMeta(SHARE_META.on, false);
+    setBusy(false);
+    toast(r.ok ? "已关闭，网页上的记录已撤下" : r.message, r.ok ? "success" : "error");
+  };
+  const syncNow = async () => {
+    setBusy(true);
+    const r = await publishShare(facts, { force: true });
+    setBusy(false);
+    toast(r.ok ? "已同步" : r.message, r.ok ? "success" : "error");
+  };
+  const saveTitle = async () => {
+    const t = shownTitle.trim() || "我的训练";
+    await setMeta(SHARE_META.title, t);
+    if (st.on) await publishShare(facts, { force: true });
+  };
+  const copy = async () => {
+    try {
+      if (navigator.share) await navigator.share({ title: shownTitle, url });
+      else {
+        await navigator.clipboard.writeText(url);
+        toast("链接已复制", "success");
+      }
+    } catch {
+      /* cancelled */
+    }
+  };
+
+  return (
+    <div>
+      <SectionTitle>公开分享</SectionTitle>
+      <Card className="space-y-3">
+        <p className="text-sm text-muted">
+          打开后，训练记录会在你每次更新后自动同步到一个只读网页，别人点链接就能看，不需要再导出 JSON。链接不会被搜索引擎收录，但知道链接的人都能看到。
+        </p>
+        <Field label="页面标题">
+          <TextInput value={shownTitle} maxLength={40} onChange={(e) => setTitle(e.target.value)} onBlur={saveTitle} data-testid="share-title" />
+        </Field>
+        {st.on ? (
+          <>
+            <div className="rounded-xl bg-surface-2 p-3 text-sm break-all" data-testid="share-url">
+              {url}
+            </div>
+            <div className="text-xs text-muted">
+              {st.err ? <span className="text-[color:var(--st-attention)]">同步失败：{st.err}</span> : st.at ? `上次同步：${new Date(st.at).toLocaleString("zh-CN", { hour12: false })}` : "等待首次同步…"}
+            </div>
+            <div className="flex gap-2">
+              <Button block variant="primary" onClick={copy}>
+                分享链接
+              </Button>
+              <Button block variant="soft" onClick={syncNow} disabled={busy}>
+                立即同步
+              </Button>
+            </div>
+            <Button block variant="danger" onClick={turnOff} disabled={busy}>
+              关闭分享并撤下
+            </Button>
+          </>
+        ) : (
+          <Button block variant="primary" onClick={turnOn} disabled={busy} data-testid="share-on">
+            开启公开分享
+          </Button>
+        )}
+        <div className="text-xs text-faint leading-relaxed">
+          公开的内容：已完成的训练、动作、每组重量/次数/时长，以及据此估算的部位状态。
+          <br />
+          不公开：体重身高、目标与伤痛备注、健身房位置、器械、照片、AI 识别记录，以及没打勾的组。
+        </div>
+        {!st.on && st.err && <div className="text-xs text-[color:var(--st-attention)]">{st.err}</div>}
+      </Card>
     </div>
   );
 }

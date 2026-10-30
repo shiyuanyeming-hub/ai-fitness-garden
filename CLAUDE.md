@@ -10,6 +10,7 @@ Personal offline-first fitness PWA (Next.js 15 App Router, React 19, Tailwind v4
 - Assisted load: bigger = easier. Never treat it as external load. Never compare weights across different machines or load kinds.
 - Algorithms in `src/core` are pure TS with no React imports. All coefficients live in `src/core/params.ts`, tagged [依据]/[估计]; bump `CALCULATION_VERSION` and update `docs/ALGORITHMS.md` when changing them.
 - The AI coach (`/api/coach`) only picks exercises from the client-sent candidate list and explains; loads/reps come from the rule engine. Its output is a suggestion snapshot (`recommendations`, `view.source = "ai"`), never a fact.
+- Public share (`/share`): the snapshot contains facts only (completed sessions, ticked sets) — never body weight, notes, gyms, photos or derived numbers. Writes need `APP_ACCESS_TOKEN`; visitors' pages must not touch the local DB.
 - The Anthropic key is server-only (`src/server`). Never expose it or add NEXT_PUBLIC_ variants.
 
 ## Commands

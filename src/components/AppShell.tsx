@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { AppDataProvider, useApp } from "@/features/app-data";
 import { ToastProvider, cx } from "./ui";
+import { ShareSync } from "@/features/share/ShareSync";
 import { RestTimerBar, RestTimerProvider } from "@/features/workout/rest-timer";
 
 const NAV = [
@@ -15,13 +16,17 @@ const NAV = [
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const path = usePathname();
   useEffect(() => {
     if (process.env.NODE_ENV !== "production" || !("serviceWorker" in navigator)) return;
     navigator.serviceWorker.register("/sw.js").catch(() => undefined);
   }, []);
+  // Public read-only page: no local database, no app navigation — visitors only see the published record.
+  if (path?.startsWith("/share")) return <ToastProvider>{children}</ToastProvider>;
   return (
     <ToastProvider>
       <AppDataProvider>
+        <ShareSync />
         <RestTimerProvider>
           <Gate>{children}</Gate>
           <RestTimerBar />

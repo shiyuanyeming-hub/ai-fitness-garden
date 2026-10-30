@@ -95,3 +95,6 @@ tests/
 - 加器械类型：`src/data/seed/equipment.ts`（`cues` 会发给视觉模型）。
 - 改表结构：在 `db.ts` 增加 `this.version(2).stores({...}).upgrade(...)`，不要修改 version(1)。
 - 换模型供应商：实现 `RecognitionProvider`（`src/server/recognition/types.ts`），在 `getProvider()` 里选择。
+
+## 公开分享（/share）
+`src/data/share.ts` 把事实（已完成训练 / 已打勾的组 / 自定义动作）裁剪成快照；`ShareSync` 在开关打开时对事实变化做防抖自动上传（指纹不变则跳过，离线时联网后重试）；`/api/share`：GET 公开只读，POST/DELETE 需 `APP_ACCESS_TOKEN`，存储在 Vercel Blob（`src/server/share-store.ts`）。`/share` 页面不加载本地数据库，访客端用 `computeDerived()` 现算，派生数据不入库。

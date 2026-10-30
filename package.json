@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.137.0",
+    "@vercel/blob": "^2.8.2",
     "dexie": "^4.4.6",
     "dexie-react-hooks": "^4.4.0",
     "framer-motion": "^11.18.2",

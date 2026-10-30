@@ -81,3 +81,15 @@ npm run build && npm run e2e # 12 个端到端验收流程（自动以 mock 识�
 4. **训练解释**：用 LLM 把规则引擎输出的原因改写成更自然的话（数字仍由规则计算）。
 5. **Apple Health**：PWA 无法直接写入；如需要可考虑 Capacitor 打包成原生壳。
 6. **休息结束提醒**：iOS 16.4+ 支持主屏幕 PWA 的 Web Push，但需要推送服务端。
+
+## 公开分享页（/share）
+
+手机上的训练数据仍然只存在本机 IndexedDB。打开「我的 → 公开分享」后，每次记录/修改，几秒后会把**事实数据快照**自动上传到云端（Vercel Blob 里一个 `share/snapshot.json`），别人访问 `https://<你的域名>/share` 即可只读查看。
+
+一次性配置（Vercel 网页）：
+1. 项目 → **Storage** → **Create Database / Store** → 选 **Blob**，Private 或 Public 都行 → 连接到本项目（会自动添加 `BLOB_READ_WRITE_TOKEN`）。
+2. 确认已设置 `APP_ACCESS_TOKEN`（没设时服务器拒绝写入，防止别人改写你的页面）。
+3. **Redeploy** 一次。
+4. 手机上「我的 → 公开分享 → 开启」，复制链接发给别人。
+
+内容：已完成的训练、动作、已打勾的组；部位状态由访客浏览器按快照现算。不含体重身高、目标/伤痛备注、健身房、器械、照片、AI 记录、未打勾的组。链接不被搜索引擎收录（noindex），但知道链接的人都能看。关闭开关会撤下云端文件。

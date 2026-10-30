@@ -252,3 +252,18 @@ test("手动新建力量器械：没有动作时可以只保存器械", async ({
   await expect(page).toHaveURL(/\/equipment/);
   await expect(page.getByText("胸推划船二合一机").first()).toBeVisible();
 });
+
+test("公开分享页：访客无底部导航、不创建本地数据；未配置云存储时给出提示", async ({ page }) => {
+  await page.goto("/share");
+  await expect(page.getByText("分享功能还没有配置完成")).toBeVisible();
+  await expect(page.getByRole("navigation")).toHaveCount(0);
+  const dbs = await page.evaluate(async () => (await indexedDB.databases()).map((d) => d.name));
+  expect(dbs).toEqual([]);
+});
+
+test("我的 → 开启公开分享：云存储没配置时明确报错且不会假装成功", async ({ page }) => {
+  await ready(page, "/me");
+  await page.getByTestId("share-on").click();
+  await expect(page.getByText(/口令|Blob|云存储/).first()).toBeVisible();
+  await expect(page.getByTestId("share-url")).toHaveCount(0);
+});
