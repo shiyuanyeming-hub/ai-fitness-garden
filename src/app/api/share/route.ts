@@ -34,7 +34,7 @@ const schema = z.object({
   publishedAt: s(40),
   title: s(40),
   timeZone: s(60),
-  sessions: z.array(z.object({ id: s(60), startedAt: s(40), completedAt: s(40).nullable(), source: z.enum(["planned", "free", "imported"]) })).max(5000),
+  sessions: z.array(z.object({ id: s(60), startedAt: s(40), completedAt: s(40).nullable(), source: z.enum(["planned", "free", "imported"]), status: z.enum(["active", "completed"]).optional() })).max(5000),
   workoutExercises: z.array(z.object({ id: s(60), sessionId: s(60), exerciseId: s(80), orderIndex: z.number() })).max(40000),
   sets: z
     .array(

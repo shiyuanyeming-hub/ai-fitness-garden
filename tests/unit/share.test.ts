@@ -22,14 +22,26 @@ async function train(sets: number, tickAll = true) {
 }
 
 describe("分享快照", () => {
-  it("只含已完成训练里已打勾的组；不含进行中的训练", async () => {
+  it("只含已打勾的组；进行中的训练有打勾的组才出现，且标记为 active", async () => {
     const done = await train(3, false); // 1 of 3 ticked
     await repo.finishSession(done.id);
-    await train(2); // still active
+    const live = await train(2); // in progress, both ticked
     const snap = buildSnapshot((await loadFacts())!, "测试");
-    expect(snap.sessions.map((s) => s.id)).toEqual([done.id]);
-    expect(snap.sets).toHaveLength(1);
+    expect(snap.sessions.map((s) => [s.id, s.status]).sort()).toEqual([[done.id, "completed"], [live.id, "active"]].sort());
+    const ticked = (await db().sets.toArray()).filter((x) => x.completedAt != null).length;
+    expect(ticked).toBeGreaterThanOrEqual(2);
+    expect(snap.sets).toHaveLength(ticked); // every ticked set, nothing else
     expect(snap.sets.every((s) => s.completedAt != null)).toBe(true);
+    const f = snapshotToFacts(snap);
+    expect(computeDerived(f, Date.now()).active?.session.id).toBe(live.id);
+  });
+
+  it("进行中的训练一组都没打勾时不公开（预填的不是事实）", async () => {
+    const s = await repo.startSession({ gymId: null });
+    await repo.addExerciseToSession(s.id, "barbell_bench_press", null, { prefill: { sets: 3, reps: 8, load: 50 } });
+    const snap = buildSnapshot((await loadFacts())!, "测试");
+    expect(snap.sessions).toHaveLength(0);
+    expect(snap.sets).toHaveLength(0);
   });
 
   it("不泄露体重、伤病备注、健身房、照片等隐私字段", async () => {

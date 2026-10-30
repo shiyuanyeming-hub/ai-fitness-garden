@@ -1,7 +1,7 @@
 /**
  * Public share snapshot.
  *
- * Only FACTS are published (completed sessions, their exercises and confirmed sets, plus the user's
+ * Only FACTS are published (completed sessions and the confirmed sets of a session still in progress, plus the user's
  * own custom exercises so names resolve). Muscle loads / recovery / stats shown on the share page are
  * recomputed in the visitor's browser with computeDerived() — nothing derived is ever stored.
  *
@@ -15,7 +15,7 @@ import { SEED_EXERCISES } from "./seed/exercises";
 export const SHARE_FORMAT = "ai-fitness-garden-share";
 export const SHARE_VERSION = 1;
 
-export type ShareSession = Pick<WorkoutSession, "id" | "startedAt" | "completedAt" | "source">;
+export type ShareSession = Pick<WorkoutSession, "id" | "startedAt" | "completedAt" | "source" | "status">;
 export type ShareExercise = Pick<WorkoutExercise, "id" | "sessionId" | "exerciseId" | "orderIndex">;
 export type ShareSet = Pick<
   WorkoutSet,
@@ -36,7 +36,11 @@ export interface ShareSnapshot {
 }
 
 export function buildSnapshot(f: Pick<Facts, "profile" | "sessions" | "workoutExercises" | "sets" | "exercises">, title: string, publishedAt = new Date().toISOString()): ShareSnapshot {
-  const sessions = f.sessions.filter((s) => s.status === "completed" && s.completedAt);
+  // A session still in progress is shown live, but only through its confirmed (ticked) sets;
+  // one without any ticked set yet is not published at all.
+  const ticked = new Set(f.sets.filter((s) => s.completedAt != null).map((s) => s.workoutExerciseId));
+  const tickedSessions = new Set(f.workoutExercises.filter((w) => ticked.has(w.id)).map((w) => w.sessionId));
+  const sessions = f.sessions.filter((s) => (s.status === "completed" && s.completedAt) || (s.status === "active" && tickedSessions.has(s.id)));
   const sid = new Set(sessions.map((s) => s.id));
   const wes = f.workoutExercises.filter((w) => sid.has(w.sessionId));
   const weId = new Set(wes.map((w) => w.id));
@@ -48,7 +52,7 @@ export function buildSnapshot(f: Pick<Facts, "profile" | "sessions" | "workoutEx
     publishedAt,
     title: title.trim().slice(0, 40) || "我的训练",
     timeZone: f.profile.timeZone,
-    sessions: sessions.map((s) => ({ id: s.id, startedAt: s.startedAt, completedAt: s.completedAt, source: s.source })),
+    sessions: sessions.map((s) => ({ id: s.id, startedAt: s.startedAt, completedAt: s.completedAt, source: s.source, status: s.status })),
     workoutExercises: wes.map((w) => ({ id: w.id, sessionId: w.sessionId, exerciseId: w.exerciseId, orderIndex: w.orderIndex })),
     sets: sets.map((s) => ({
       id: s.id,
@@ -104,7 +108,7 @@ export function snapshotToFacts(s: ShareSnapshot): Facts {
   for (const c of s.customExercises) byId.set(c.id, c);
   return {
     profile,
-    sessions: s.sessions.map((x) => ({ ...x, gymId: null, status: "completed" as const, createdAt: x.startedAt, updatedAt: x.startedAt })),
+    sessions: s.sessions.map((x) => ({ ...x, gymId: null, status: x.status ?? ("completed" as const), createdAt: x.startedAt, updatedAt: x.startedAt })),
     workoutExercises: s.workoutExercises.map((w) => ({ ...w, gymEquipmentId: null, startedAt: null, completedAt: null, createdAt: stamp, updatedAt: stamp })),
     sets: s.sets.map((x) => ({ ...x, createdAt: x.completedAt ?? stamp, updatedAt: x.completedAt ?? stamp })),
     feedback: [],

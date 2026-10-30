@@ -26,7 +26,7 @@ export function ShareSync() {
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(run, ms);
     };
-    schedule(4000);
+    schedule(2500);
     const wake = () => document.visibilityState === "visible" && schedule(1500);
     window.addEventListener("online", wake);
     document.addEventListener("visibilitychange", wake);

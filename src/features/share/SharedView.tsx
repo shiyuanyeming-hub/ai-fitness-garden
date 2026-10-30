@@ -6,6 +6,8 @@ import { weeklyFrequency, sessionDurationMin } from "@/core/analytics";
 import { MUSCLE_BY_ID, REGIONS } from "@/core/muscles";
 import { diffDays, formatLocalTime, sessionDateKey } from "@/core/time";
 import { summarizeSession } from "@/core/summary";
+import type { SessionBundle } from "@/core/muscle-analysis";
+import type { Exercise } from "@/core/types";
 import { computeDerived } from "@/data/derived";
 import { snapshotToFacts } from "@/data/share";
 import { fetchShare, type FetchShare } from "./client";
@@ -20,7 +22,7 @@ export function SharedView() {
     let alive = true;
     const load = () => fetchShare().then((r) => alive && setRes(r));
     load();
-    const t = setInterval(load, 60_000);
+    const t = setInterval(load, 15_000);
     const onVis = () => document.visibilityState === "visible" && load();
     document.addEventListener("visibilitychange", onVis);
     return () => {
@@ -81,6 +83,8 @@ function Loaded({ snapshot }: { snapshot: NonNullable<Extract<FetchShare, { stat
         <Stat label="近 28 天" value={`${last28}`} unit="次" />
         <Stat label="距上次" value={lastDays == null ? "—" : lastDays === 0 ? "今天" : `${lastDays}`} unit={lastDays ? "天" : ""} />
       </div>
+
+      {d.active && <LiveCard bundle={d.active} exerciseById={d.exerciseById} />}
 
       <SectionTitle>每周训练天数</SectionTitle>
       <Card>
@@ -152,5 +156,27 @@ function Stat({ label, value, unit }: { label: string; value: string; unit: stri
         <span className="text-xs font-normal text-muted ml-0.5">{unit}</span>
       </div>
     </Card>
+  );
+}
+
+function LiveCard({ bundle, exerciseById }: { bundle: SessionBundle; exerciseById: Record<string, Exercise> }) {
+  const sum = summarizeSession(bundle, exerciseById);
+  return (
+    <>
+      <SectionTitle>
+        <span className="text-accent">● 正在训练</span>
+      </SectionTitle>
+      <Card data-testid="live-session">
+        <div className="space-y-0.5">
+          {sum.exercises.map((e) => (
+            <div key={e.exerciseId} className="flex justify-between text-sm gap-2">
+              <span className="truncate">{e.name}</span>
+              <span className="text-muted shrink-0">{e.detail}</span>
+            </div>
+          ))}
+        </div>
+        <div className="text-xs text-faint mt-2">只显示已完成的组，训练结束后会归入下面的记录。</div>
+      </Card>
+    </>
   );
 }
